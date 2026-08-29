@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { loadDatabaseConfig } from "./client.js";
@@ -42,7 +43,7 @@ async function main(): Promise<void> {
   }
 }
 
-if (process.argv[1] && import.meta.url === new URL(process.argv[1], "file:").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error: unknown) => {
     console.error("Seed failed:", error instanceof Error ? error.message : error);
     process.exit(1);

@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, index, check } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, timestamp, index, check, foreignKey } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { incidents } from "./incidents.js";
 import { users } from "./users.js";
@@ -21,9 +21,7 @@ export const incidentParticipants = pgTable(
     participantType: varchar("participant_type", { length: 16 }).notNull(),
     userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
     contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "cascade" }),
-    guestInvitationId: uuid("guest_invitation_id").references(() => guestInvitations.id, {
-      onDelete: "cascade",
-    }),
+    guestInvitationId: uuid("guest_invitation_id"),
     participantRole: varchar("participant_role", { length: 64 }).notNull().default("participant"),
     status: varchar("status", { length: 16 }).notNull().default("invited"),
     joinedAt: timestamp("joined_at", { withTimezone: true }),
@@ -33,6 +31,13 @@ export const incidentParticipants = pgTable(
   },
   (table) => [
     index("incident_participants_incident_id_idx").on(table.incidentId),
+    // Explicit short name: the auto-generated name for this FK exceeds PostgreSQL's
+    // 63-byte identifier limit and gets silently truncated (surfaced as a NOTICE on migrate).
+    foreignKey({
+      columns: [table.guestInvitationId],
+      foreignColumns: [guestInvitations.id],
+      name: "incident_participants_guest_invitation_fk",
+    }).onDelete("cascade"),
     check(
       "incident_participants_type_check",
       sql`${table.participantType} IN ('user', 'contact', 'guest')`,

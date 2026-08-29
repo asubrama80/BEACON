@@ -11,14 +11,21 @@ async function main(): Promise<void> {
     const db = drizzle(client);
 
     const migrations = await client`
-      select tag, created_at
+      select hash, created_at
       from drizzle.__drizzle_migrations
       order by created_at asc
-    `.catch(() => []);
+    `.catch((error: { code?: string }) => {
+      // 42P01 = undefined_table: no migration has ever been applied yet.
+      if (error.code === "42P01") {
+        return [];
+      }
+      throw error;
+    });
 
     console.log(`Applied migrations: ${migrations.length}`);
     for (const row of migrations) {
-      console.log(`  - ${String(row.tag ?? row.hash ?? "unknown")}`);
+      const appliedAt = new Date(Number(row.created_at)).toISOString();
+      console.log(`  - ${String(row.hash).slice(0, 12)} (${appliedAt})`);
     }
 
     const roleRows = await db.select({ code: roles.code }).from(roles);

@@ -88,6 +88,7 @@ describe.skipIf(!process.env.DATABASE_URL)("effective permissions (live database
       [
         "contacts.create",
         "contacts.disable",
+        "contacts.import",
         "contacts.read",
         "contacts.update",
         "permissions.read",

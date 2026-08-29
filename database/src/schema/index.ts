@@ -15,3 +15,4 @@ export * from "./mfaCredentials.js";
 export * from "./mfaRecoveryCodes.js";
 export * from "./permissions.js";
 export * from "./rolePermissions.js";
+export * from "./contactImportBatches.js";

@@ -25,7 +25,9 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
     }
   }
 
-  if (options.body && !headers.has("Content-Type")) {
+  // A FormData body (e.g. Module 05's file upload) must keep the browser-generated
+  // multipart Content-Type/boundary header — never overwrite it with application/json.
+  if (options.body && !(options.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 

@@ -20,7 +20,10 @@ export type AuthAuditEventType =
   | "CONTACT_CREATED"
   | "CONTACT_UPDATED"
   | "CONTACT_DISABLED"
-  | "CONTACT_ENABLED";
+  | "CONTACT_ENABLED"
+  | "CONTACT_IMPORT_PREVIEWED"
+  | "CONTACT_IMPORT_COMPLETED"
+  | "CONTACT_IMPORT_FAILED";
 
 export interface RecordAuthEventInput {
   eventType: AuthAuditEventType;

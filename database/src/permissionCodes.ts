@@ -45,3 +45,18 @@ export const MODULE_04_PERMISSIONS = [
 ] as const;
 
 export type Module04PermissionCode = (typeof MODULE_04_PERMISSIONS)[number]["code"];
+
+/**
+ * Module 05's contact-import permission code. Kept in its own module file (even though the
+ * code's resource prefix is still `contacts`) so each module continues to own exactly the
+ * permissions it introduces, per the established per-module seeding convention.
+ */
+export const MODULE_05_PERMISSIONS = [
+  {
+    code: "contacts.import",
+    name: "Import contacts",
+    description: "Bulk-import contacts from an uploaded CSV or XLSX file.",
+  },
+] as const;
+
+export type Module05PermissionCode = (typeof MODULE_05_PERMISSIONS)[number]["code"];

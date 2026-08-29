@@ -4,6 +4,7 @@ import { listContacts } from "./api";
 import type { Contact } from "./types";
 import CreateContactModal from "./CreateContactModal";
 import ContactDetailModal from "./ContactDetailModal";
+import ContactImportPage from "../contactImport/ContactImportPage";
 import { useAuth } from "../auth/useAuth";
 
 export default function ContactsPage(): JSX.Element {
@@ -16,8 +17,10 @@ export default function ContactsPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   const canCreate = user?.permissions.includes("contacts.create") ?? false;
+  const canImport = user?.permissions.includes("contacts.import") ?? false;
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -36,6 +39,17 @@ export default function ContactsPage(): JSX.Element {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  if (showImport) {
+    return (
+      <ContactImportPage
+        onDone={() => {
+          setShowImport(false);
+          void refresh();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="contacts-page">
@@ -59,6 +73,11 @@ export default function ContactsPage(): JSX.Element {
           </select>
         </div>
         <div className="toolbar-actions">
+          {canImport && (
+            <button type="button" className="btn btn-secondary" onClick={() => setShowImport(true)}>
+              Import Contacts
+            </button>
+          )}
           {canCreate && (
             <button type="button" className="btn btn-primary" onClick={() => setShowCreate(true)}>
               Add Contact

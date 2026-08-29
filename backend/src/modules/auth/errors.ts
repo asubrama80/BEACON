@@ -16,7 +16,11 @@ export type AuthErrorCode =
   | "not_found"
   | "role_not_found"
   | "role_already_assigned"
-  | "likely_duplicate";
+  | "likely_duplicate"
+  | "import_file_invalid"
+  | "import_mapping_invalid"
+  | "import_batch_expired"
+  | "import_batch_not_previewable";
 
 /**
  * A deliberately generic, safe error surfaced to the client — never a stack trace or DB

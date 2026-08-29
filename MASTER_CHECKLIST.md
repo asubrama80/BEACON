@@ -9,7 +9,7 @@ Work proceeds one module at a time, in order, unless the user directs otherwise.
 - [x] 02 Authentication
 - [x] 03 Users & RBAC
 - [x] 04 Contacts
-- [ ] 05 Excel/CSV Import
+- [x] 05 Excel/CSV Import
 - [ ] 06 Groups
 - [ ] 07 Templates
 - [ ] 08 Incident Management

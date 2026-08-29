@@ -8,8 +8,10 @@ import { rolePermissions } from "./schema/rolePermissions.js";
 import {
   MODULE_03_PERMISSIONS,
   MODULE_04_PERMISSIONS,
+  MODULE_05_PERMISSIONS,
   type Module03PermissionCode,
   type Module04PermissionCode,
+  type Module05PermissionCode,
 } from "./permissionCodes.js";
 
 const ROLE_NAMES: Record<SystemRoleCode, string> = {
@@ -38,19 +40,20 @@ export async function seedRoles(db: ReturnType<typeof drizzle>): Promise<void> {
   await db.insert(roles).values(values).onConflictDoNothing({ target: roles.code });
 }
 
-const ALL_PERMISSIONS = [...MODULE_03_PERMISSIONS, ...MODULE_04_PERMISSIONS];
-type AnyPermissionCode = Module03PermissionCode | Module04PermissionCode;
+const ALL_PERMISSIONS = [...MODULE_03_PERMISSIONS, ...MODULE_04_PERMISSIONS, ...MODULE_05_PERMISSIONS];
+type AnyPermissionCode = Module03PermissionCode | Module04PermissionCode | Module05PermissionCode;
 
 /**
  * ADMIN gets full administrative control of every seeded permission. Other roles are granted
  * only what's justified by their current, already-implemented job — see the module prompts
- * (claude/prompts/03-users-rbac.md, 04-contacts.md) for the reasoning behind each grant.
+ * (claude/prompts/03-users-rbac.md, 04-contacts.md, 05-excel-csv-import.md) for the reasoning
+ * behind each grant.
  */
 const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> = {
   ADMIN: ALL_PERMISSIONS.map((p) => p.code),
   AUDITOR: ["users.read", "roles.read", "permissions.read", "contacts.read"],
   INCIDENT_COMMANDER: ["contacts.read"],
-  COMMUNICATION_MANAGER: ["contacts.read", "contacts.create", "contacts.update"],
+  COMMUNICATION_MANAGER: ["contacts.read", "contacts.create", "contacts.update", "contacts.import"],
   RESPONDER: [],
 };
 

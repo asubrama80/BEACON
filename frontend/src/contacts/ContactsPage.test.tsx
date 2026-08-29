@@ -131,4 +131,38 @@ describe("ContactsPage", () => {
     expect(confirmedCall).toBe(true);
     expect(screen.getByRole("button", { name: "Create anyway" })).toBeInTheDocument();
   });
+
+  it("hides the Import Contacts button without contacts.import", async () => {
+    mockRoutes();
+    renderContactsPage();
+
+    await screen.findByText("Existing Contact");
+    expect(screen.queryByRole("button", { name: "Import Contacts" })).not.toBeInTheDocument();
+  });
+
+  it("shows the Import Contacts button and opens the import wizard when granted contacts.import", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL, init?: RequestInit) => {
+        const path = new URL(String(input)).pathname;
+        const method = (init?.method ?? "GET").toUpperCase();
+        if (path === "/auth/me") {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ user: { ...ADMIN_USER, permissions: [...ADMIN_USER.permissions, "contacts.import"] } }),
+          });
+        }
+        if (path === "/contacts" && method === "GET") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [], total: 0, page: 1, pageSize: 25 }) });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }),
+    );
+    renderContactsPage();
+
+    const importButton = await screen.findByRole("button", { name: "Import Contacts" });
+    fireEvent.click(importButton);
+
+    expect(await screen.findByRole("heading", { name: "Import Contacts" })).toBeInTheDocument();
+  });
 });

@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyError } from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
+import multipart from "@fastify/multipart";
 import { closeDb } from "@beacon/database";
 import { loadEnv, type AppEnv } from "./config/env.js";
 import { healthRoutes } from "./routes/health.js";
@@ -11,17 +12,21 @@ import { AuthError } from "./modules/auth/errors.js";
 import { usersRoutes } from "./modules/users/routes.js";
 import { rbacRoutes } from "./modules/rbac/routes.js";
 import { contactsRoutes } from "./modules/contacts/routes.js";
+import { loadContactImportConfig, type ContactImportConfig } from "./modules/contactImport/config.js";
+import { contactImportRoutes } from "./modules/contactImport/routes.js";
 
 export interface BuildAppOptions {
   env?: AppEnv;
   authConfig?: AuthConfig;
   mfaEncryptionKey?: Buffer;
+  contactImportConfig?: ContactImportConfig;
 }
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const env = options.env ?? loadEnv();
   const authConfig = options.authConfig ?? loadAuthConfig();
   const mfaEncryptionKey = options.mfaEncryptionKey ?? loadMfaEncryptionKey();
+  const contactImportConfig = options.contactImportConfig ?? loadContactImportConfig();
 
   const app = Fastify({ logger: env.nodeEnv !== "test" });
 
@@ -31,12 +36,19 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // origin is an explicit allow-list (never "*") because credentials:true forbids a wildcard.
   app.register(cors, { origin: env.corsOrigin, credentials: true });
   app.register(rateLimit, { global: false });
+  // Bounded, in-memory-only multipart handling for Module 05's spreadsheet upload — the byte
+  // limit here is the primary defense against an oversized upload consuming memory; the route
+  // handler double-checks `file.truncated` since a file at exactly the limit streams without error.
+  app.register(multipart, {
+    limits: { fileSize: contactImportConfig.maxFileSizeBytes, files: 1, fields: 0 },
+  });
 
   app.register((instance) => healthRoutes(instance, env));
   app.register((instance) => authRoutes(instance, { config: authConfig, mfaEncryptionKey }));
   app.register((instance) => usersRoutes(instance, { config: authConfig }));
   app.register((instance) => rbacRoutes(instance, { config: authConfig }));
   app.register((instance) => contactsRoutes(instance, { config: authConfig }));
+  app.register((instance) => contactImportRoutes(instance, { config: authConfig, importConfig: contactImportConfig }));
 
   app.setErrorHandler((error: FastifyError | AuthError, request, reply) => {
     if (error instanceof AuthError) {

@@ -1,0 +1,85 @@
+@import "../components/adminUi.css";
+
+.card-pad {
+  padding: 24px;
+}
+
+.import-wizard-steps {
+  display: flex;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px 0;
+  flex-wrap: wrap;
+}
+.import-wizard-steps li {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-faint);
+  background: var(--surface-alt);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 14px;
+}
+.import-wizard-steps li.is-active {
+  color: #fff;
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.import-wizard-steps li.is-done {
+  color: var(--success);
+  background: var(--success-soft);
+  border-color: var(--success-soft);
+}
+
+.dropzone {
+  border: 2px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--surface-alt);
+}
+.dropzone:hover {
+  border-color: var(--brand);
+}
+.dropzone-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.import-stats {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.import-stat {
+  padding: 14px;
+  background: var(--surface-alt);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+.import-stat .n {
+  font-size: 19px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.import-stat .l {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-weight: 600;
+  margin-top: 2px;
+}
+@media (max-width: 900px) {
+  .import-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 520px) {
+  .import-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

@@ -24,7 +24,8 @@ async function loadDto(db: Database, id: string): Promise<ContactDto> {
   return toContactDto(row);
 }
 
-function validateName(value: string, label: string): string {
+/** Exported for reuse by Module 05's bulk import, which must apply identical validation. */
+export function validateName(value: string, label: string): string {
   const trimmed = value.trim();
   if (!trimmed) {
     throw new AuthError(400, "invalid_request", `${label} is required.`);
@@ -36,14 +37,15 @@ function validateName(value: string, label: string): string {
 }
 
 /** Normalizes and validates the optional channel/metadata fields shared by create and update. */
-interface NormalizedChannelFields {
+export interface NormalizedChannelFields {
   email?: string | undefined;
   mobilePhone?: string | undefined;
   department?: string | undefined;
   referenceId?: string | undefined;
 }
 
-function normalizeChannelFields(input: NormalizedChannelFields): NormalizedChannelFields {
+/** Exported for reuse by Module 05's bulk import — identical validation/normalization rules. */
+export function normalizeChannelFields(input: NormalizedChannelFields): NormalizedChannelFields {
   const result: NormalizedChannelFields = {};
 
   if (input.email !== undefined) {

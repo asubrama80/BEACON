@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildApp } from "../app.js";
-import { loadEnv } from "../config/env.js";
+import { buildTestApp } from "./testApp.js";
 
 describe("GET /health", () => {
   it("returns 200 with status, application, environment, and timestamp", async () => {
-    const app = buildApp(loadEnv({ NODE_ENV: "test" }));
+    const app = buildTestApp();
 
     const response = await app.inject({ method: "GET", url: "/health" });
 
@@ -24,7 +23,7 @@ describe("GET /health", () => {
     const originalUrl = process.env.DATABASE_URL;
     delete process.env.DATABASE_URL;
 
-    const app = buildApp(loadEnv({ NODE_ENV: "test" }));
+    const app = buildTestApp();
     const response = await app.inject({ method: "GET", url: "/health" });
 
     expect(response.statusCode).toBe(200);

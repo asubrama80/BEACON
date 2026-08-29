@@ -6,7 +6,7 @@ Work proceeds one module at a time, in order, unless the user directs otherwise.
 
 - [x] 00 Project Bootstrap
 - [x] 01 Database Foundation
-- [ ] 02 Authentication
+- [x] 02 Authentication
 - [ ] 03 Users & RBAC
 - [ ] 04 Contacts
 - [ ] 05 Excel/CSV Import

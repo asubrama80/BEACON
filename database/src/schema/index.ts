@@ -10,3 +10,6 @@ export * from "./alerts.js";
 export * from "./alertRecipients.js";
 export * from "./chatMessages.js";
 export * from "./auditLogs.js";
+export * from "./sessions.js";
+export * from "./mfaCredentials.js";
+export * from "./mfaRecoveryCodes.js";

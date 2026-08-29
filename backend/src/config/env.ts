@@ -3,6 +3,7 @@ export interface AppEnv {
   appName: string;
   host: string;
   port: number;
+  corsOrigin: string;
 }
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
@@ -11,5 +12,6 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     appName: "beacon-backend",
     host: source.BACKEND_HOST ?? "0.0.0.0",
     port: Number(source.BACKEND_PORT ?? 4000),
+    corsOrigin: source.CORS_ORIGIN ?? "http://localhost:5173",
   };
 }

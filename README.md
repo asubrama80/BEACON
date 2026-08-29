@@ -27,7 +27,8 @@ Implementation proceeds **one numbered module at a time**. See [MASTER_CHECKLIST
 
 - **Module 00 — Project Bootstrap: complete.** Repository skeleton, frontend/backend application shells, PostgreSQL dev service, Docker Compose foundation, tooling, and CI-equivalent checks (lint/typecheck/test/build) are in place.
 - **Module 01 — Database Foundation: complete.** PostgreSQL + Drizzle ORM foundation schema (14 core tables), a reusable connection pool, committed migrations, an idempotent system-role seed, and database health reporting on `GET /health`. No business logic (login, RBAC, alert sending, chat, guest verification) yet.
-- **Next: Module 02 — Authentication.**
+- **Module 02 — Authentication: complete.** Local email/password login (Argon2id), server-side sessions (HttpOnly + SameSite cookies), CSRF protection, login throttling, TOTP MFA with one-time recovery codes, a local emergency break-glass account, authentication audit events, a `bootstrap-user` CLI, and a minimal login/MFA/logout frontend. No enterprise identity provider (AD/Entra/Okta/LDAP/M365) dependency. See [claude/prompts/02-authentication.md](claude/prompts/02-authentication.md) for the full design. RBAC/authorization is not implemented yet.
+- **Next: Module 03 — Users & RBAC.**
 
 ## Prerequisites
 
@@ -78,6 +79,14 @@ npm run db:status     # list applied migrations and seeded roles
 ```
 
 `GET /health` reports database connectivity alongside application status (`{"database": {"connected": true|false}}`) without exposing credentials. See [database/README.md](database/README.md) for schema layout, migration policy, and backup/restore steps.
+
+### Create a local user
+
+```bash
+npm run bootstrap-user --workspace backend
+```
+
+Interactive prompt (never accepts a password via flag/env var). Answer "y" to the break-glass question only for the single local emergency admin account — see [claude/prompts/02-authentication.md](claude/prompts/02-authentication.md) for the full break-glass process, including enrolling MFA immediately afterward.
 
 ### Start everything with Docker Compose
 

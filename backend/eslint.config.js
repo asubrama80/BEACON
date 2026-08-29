@@ -15,6 +15,14 @@ export default tseslint.config(
     },
   },
   {
+    files: ["scripts/**/*.ts"],
+    languageOptions: {
+      parserOptions: {
+        project: "./tsconfig.scripts.json",
+      },
+    },
+  },
+  {
     ignores: ["dist/**", "node_modules/**"],
   },
 );

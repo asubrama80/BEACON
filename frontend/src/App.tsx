@@ -1,6 +1,31 @@
 import "./App.css";
+import { AuthProvider } from "./auth/AuthContext";
+import { useAuth } from "./auth/useAuth";
+import LoginPage from "./auth/LoginPage";
 
 export default function App(): JSX.Element {
+  return (
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
+  );
+}
+
+function AppShell(): JSX.Element {
+  const { user, loading, logout } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="app-shell-loading" role="status">
+        Loading…
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
+
   return (
     <div className="app-shell">
       <header className="app-shell-header">
@@ -20,15 +45,21 @@ export default function App(): JSX.Element {
             <path d="M18.5 5.5a9 9 0 0 1 0 13" />
           </svg>
         </div>
-        <div>
+        <div className="app-shell-title-group">
           <h1 className="app-shell-title">BEACON</h1>
           <p className="app-shell-subtitle">Emergency Communication Platform</p>
+        </div>
+        <div className="app-shell-user">
+          <span className="app-shell-user-name">{user.displayName}</span>
+          <button type="button" className="app-shell-logout" onClick={() => void logout()}>
+            Log out
+          </button>
         </div>
       </header>
 
       <main className="app-shell-main">
         <div className="app-shell-status-card">
-          <h2>Application shell is running</h2>
+          <h2>Signed in</h2>
           <p>Business modules are implemented in later steps.</p>
         </div>
       </main>

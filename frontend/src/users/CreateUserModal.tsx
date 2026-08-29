@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import Modal from "./Modal";
+import Modal from "../components/Modal";
 import { createUser, listRoles } from "./api";
 import type { RoleRef, UserDetail } from "./types";
 

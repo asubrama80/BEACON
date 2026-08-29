@@ -4,6 +4,7 @@ import { AuthProvider } from "./auth/AuthContext";
 import { useAuth } from "./auth/useAuth";
 import LoginPage from "./auth/LoginPage";
 import UsersPage from "./users/UsersPage";
+import ContactsPage from "./contacts/ContactsPage";
 
 export default function App(): JSX.Element {
   return (
@@ -13,7 +14,7 @@ export default function App(): JSX.Element {
   );
 }
 
-type View = "dashboard" | "users";
+type View = "dashboard" | "users" | "contacts";
 
 function AppShell(): JSX.Element {
   const { user, loading, logout } = useAuth();
@@ -32,6 +33,7 @@ function AppShell(): JSX.Element {
   }
 
   const canViewUsers = user.permissions.includes("users.read");
+  const canViewContacts = user.permissions.includes("contacts.read");
 
   return (
     <div className="app-shell">
@@ -57,7 +59,7 @@ function AppShell(): JSX.Element {
           <p className="app-shell-subtitle">Emergency Communication Platform</p>
         </div>
 
-        {canViewUsers && (
+        {(canViewUsers || canViewContacts) && (
           <nav className="app-shell-nav">
             <button
               type="button"
@@ -66,13 +68,24 @@ function AppShell(): JSX.Element {
             >
               Dashboard
             </button>
-            <button
-              type="button"
-              className={`app-shell-nav-link ${view === "users" ? "is-active" : ""}`}
-              onClick={() => setView("users")}
-            >
-              Users
-            </button>
+            {canViewContacts && (
+              <button
+                type="button"
+                className={`app-shell-nav-link ${view === "contacts" ? "is-active" : ""}`}
+                onClick={() => setView("contacts")}
+              >
+                Contacts
+              </button>
+            )}
+            {canViewUsers && (
+              <button
+                type="button"
+                className={`app-shell-nav-link ${view === "users" ? "is-active" : ""}`}
+                onClick={() => setView("users")}
+              >
+                Users
+              </button>
+            )}
           </nav>
         )}
 
@@ -87,6 +100,8 @@ function AppShell(): JSX.Element {
       <main className="app-shell-main">
         {view === "users" && canViewUsers ? (
           <UsersPage />
+        ) : view === "contacts" && canViewContacts ? (
+          <ContactsPage />
         ) : (
           <div className="app-shell-status-card">
             <h2>Signed in</h2>

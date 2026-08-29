@@ -15,7 +15,8 @@ export type AuthErrorCode =
   | "duplicate_email"
   | "not_found"
   | "role_not_found"
-  | "role_already_assigned";
+  | "role_already_assigned"
+  | "likely_duplicate";
 
 /**
  * A deliberately generic, safe error surfaced to the client — never a stack trace or DB
@@ -29,13 +30,15 @@ export class AuthError extends Error {
     public readonly statusCode: number,
     public readonly code: AuthErrorCode,
     message: string,
+    /** Optional safe, structured extra context (e.g. Module 04's likely-duplicate matches). */
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "AuthError";
   }
 
-  toResponse(): { error: AuthErrorCode; message: string } {
-    return { error: this.code, message: this.message };
+  toResponse(): { error: AuthErrorCode; message: string } & Record<string, unknown> {
+    return { error: this.code, message: this.message, ...(this.details ?? {}) };
   }
 }
 

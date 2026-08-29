@@ -16,7 +16,11 @@ export type AuthAuditEventType =
   | "USER_ENABLED"
   | "USER_PASSWORD_RESET"
   | "USER_ROLE_ASSIGNED"
-  | "USER_ROLE_REMOVED";
+  | "USER_ROLE_REMOVED"
+  | "CONTACT_CREATED"
+  | "CONTACT_UPDATED"
+  | "CONTACT_DISABLED"
+  | "CONTACT_ENABLED";
 
 export interface RecordAuthEventInput {
   eventType: AuthAuditEventType;

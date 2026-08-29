@@ -59,7 +59,7 @@ describe.skipIf(!process.env.DATABASE_URL)("effective permissions (live database
     await db.insert(userRoles).values({ userId, roleId: await roleId("AUDITOR") });
 
     const perms = await getEffectivePermissions(db, userId);
-    expect([...perms].sort()).toEqual(["permissions.read", "roles.read", "users.read"]);
+    expect([...perms].sort()).toEqual(["contacts.read", "permissions.read", "roles.read", "users.read"]);
 
     await db.delete(userRoles).where(eq(userRoles.userId, userId));
   });
@@ -71,20 +71,33 @@ describe.skipIf(!process.env.DATABASE_URL)("effective permissions (live database
     ]);
 
     const perms = await getEffectivePermissions(db, userId);
-    // AUDITOR grants 3 Module 03 permissions; RESPONDER grants none — union should equal AUDITOR's set exactly,
-    // and never contain a duplicate (Set already guarantees this, but assert the count matches too).
-    expect(perms.size).toBe(3);
-    expect([...perms].sort()).toEqual(["permissions.read", "roles.read", "users.read"]);
+    // AUDITOR grants 4 permissions (Module 03 + Module 04); RESPONDER grants none — union should
+    // equal AUDITOR's set exactly, and never contain a duplicate (Set already guarantees this,
+    // but assert the count matches too).
+    expect(perms.size).toBe(4);
+    expect([...perms].sort()).toEqual(["contacts.read", "permissions.read", "roles.read", "users.read"]);
 
     await db.delete(userRoles).where(eq(userRoles.userId, userId));
   });
 
-  it("ADMIN receives every current Module 03 permission", async () => {
+  it("ADMIN receives every current permission", async () => {
     await db.insert(userRoles).values({ userId, roleId: await roleId("ADMIN") });
 
     const perms = await getEffectivePermissions(db, userId);
     expect([...perms].sort()).toEqual(
-      ["permissions.read", "roles.read", "users.create", "users.disable", "users.read", "users.roles.assign", "users.update"].sort(),
+      [
+        "contacts.create",
+        "contacts.disable",
+        "contacts.read",
+        "contacts.update",
+        "permissions.read",
+        "roles.read",
+        "users.create",
+        "users.disable",
+        "users.read",
+        "users.roles.assign",
+        "users.update",
+      ].sort(),
     );
 
     await db.delete(userRoles).where(eq(userRoles.userId, userId));

@@ -10,6 +10,7 @@ import { authRoutes } from "./modules/auth/routes.js";
 import { AuthError } from "./modules/auth/errors.js";
 import { usersRoutes } from "./modules/users/routes.js";
 import { rbacRoutes } from "./modules/rbac/routes.js";
+import { contactsRoutes } from "./modules/contacts/routes.js";
 
 export interface BuildAppOptions {
   env?: AppEnv;
@@ -35,6 +36,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.register((instance) => authRoutes(instance, { config: authConfig, mfaEncryptionKey }));
   app.register((instance) => usersRoutes(instance, { config: authConfig }));
   app.register((instance) => rbacRoutes(instance, { config: authConfig }));
+  app.register((instance) => contactsRoutes(instance, { config: authConfig }));
 
   app.setErrorHandler((error: FastifyError | AuthError, request, reply) => {
     if (error instanceof AuthError) {

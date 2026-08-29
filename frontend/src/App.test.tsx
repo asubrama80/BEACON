@@ -134,4 +134,48 @@ describe("App", () => {
       expect(screen.getByRole("heading", { level: 2, name: "Users" })).toBeInTheDocument();
     });
   });
+
+  it("shows Contacts navigation for a user with contacts.read and can reach the page", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL) => {
+        const path = new URL(String(input)).pathname;
+        if (path === "/auth/me") {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                user: {
+                  id: "44444444-4444-4444-4444-444444444444",
+                  email: "commmanager@example.invalid",
+                  displayName: "Comm Manager",
+                  status: "active",
+                  isBreakGlass: false,
+                  mfaEnabled: false,
+                  roles: ["COMMUNICATION_MANAGER"],
+                  permissions: ["contacts.read", "contacts.create"],
+                },
+              }),
+          });
+        }
+        if (path === "/contacts") {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ items: [], total: 0, page: 1, pageSize: 25 }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }),
+    );
+
+    render(<App />);
+
+    expect(screen.queryByRole("button", { name: "Users" })).not.toBeInTheDocument();
+    const contactsNavButton = await screen.findByRole("button", { name: "Contacts" });
+    contactsNavButton.click();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2, name: "Contacts" })).toBeInTheDocument();
+    });
+  });
 });

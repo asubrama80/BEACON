@@ -1,5 +1,16 @@
 import { eq } from "drizzle-orm";
-import { userRoles, rolePermissions, permissions, roles, type Database } from "@beacon/database";
+import {
+  userRoles,
+  rolePermissions,
+  permissions,
+  roles,
+  type Database,
+  type Module03PermissionCode,
+  type Module04PermissionCode,
+} from "@beacon/database";
+
+/** Union of every module's seeded permission codes — extend as each new module adds its own. */
+export type PermissionCode = Module03PermissionCode | Module04PermissionCode;
 
 /**
  * Effective permissions: the UNION of every permission granted by every role assigned to the

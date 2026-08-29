@@ -29,7 +29,8 @@ Implementation proceeds **one numbered module at a time**. See [MASTER_CHECKLIST
 - **Module 01 — Database Foundation: complete.** PostgreSQL + Drizzle ORM foundation schema (14 core tables), a reusable connection pool, committed migrations, an idempotent system-role seed, and database health reporting on `GET /health`. No business logic (login, RBAC, alert sending, chat, guest verification) yet.
 - **Module 02 — Authentication: complete.** Local email/password login (Argon2id), server-side sessions (HttpOnly + SameSite cookies), CSRF protection, login throttling, TOTP MFA with one-time recovery codes, a local emergency break-glass account, authentication audit events, a `bootstrap-user` CLI, and a minimal login/MFA/logout frontend. No enterprise identity provider (AD/Entra/Okta/LDAP/M365) dependency. See [claude/prompts/02-authentication.md](claude/prompts/02-authentication.md) for the full design.
 - **Module 03 — Users & RBAC: complete.** Permission-based authorization (`requirePermission`, never role-name checks) on top of Module 02's sessions; registered-user administration (list/create/update/disable/enable, role assignment, admin password reset); a last-active-administrator safeguard and break-glass account protection; user/RBAC audit events; and a minimal Users admin frontend, visible only to permitted users. See [claude/prompts/03-users-rbac.md](claude/prompts/03-users-rbac.md) for the full design. Contacts and custom-role administration are not implemented yet.
-- **Next: Module 04 — Contacts.**
+- **Module 04 — Contacts: complete.** The BEACON contact directory — people BEACON can reach who are never automatically application users. Email/phone normalization, non-blocking duplicate detection with explicit override, active/inactive lifecycle (no hard delete), permission-based CRUD (`contacts.read/create/update/disable`), contact audit events, and a minimal Contacts admin frontend. See [claude/prompts/04-contacts.md](claude/prompts/04-contacts.md) for the full design. CSV/Excel import, Groups, and alert sending are not implemented yet.
+- **Next: Module 05 — Excel/CSV Import.**
 
 ## Prerequisites
 
@@ -75,7 +76,7 @@ With PostgreSQL running (Docker or otherwise) and `DATABASE_URL` configured in `
 
 ```bash
 npm run db:migrate   # apply committed migrations
-npm run db:seed      # idempotently ensure the 5 system roles + Module 03 permissions exist
+npm run db:seed      # idempotently ensure the 5 system roles + Module 03/04 permissions exist
 npm run db:status     # list applied migrations, seeded roles, and permissions
 ```
 

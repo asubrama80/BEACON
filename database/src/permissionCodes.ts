@@ -27,3 +27,21 @@ export const MODULE_03_PERMISSIONS = [
 ] as const;
 
 export type Module03PermissionCode = (typeof MODULE_03_PERMISSIONS)[number]["code"];
+
+/**
+ * Module 04's contact-management permission codes. Same convention: seeded once, never
+ * renamed, shared by the seed script and `requirePermission()`. Future modules (Groups,
+ * Alerts, Incidents, …) seed their own permissions when they're implemented.
+ */
+export const MODULE_04_PERMISSIONS = [
+  { code: "contacts.read", name: "View contacts", description: "List and view BEACON contacts." },
+  { code: "contacts.create", name: "Create contacts", description: "Create a new BEACON contact." },
+  { code: "contacts.update", name: "Update contacts", description: "Edit a contact's details." },
+  {
+    code: "contacts.disable",
+    name: "Disable/enable contacts",
+    description: "Disable or re-enable a contact's active status.",
+  },
+] as const;
+
+export type Module04PermissionCode = (typeof MODULE_04_PERMISSIONS)[number]["code"];

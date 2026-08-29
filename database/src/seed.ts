@@ -5,7 +5,12 @@ import { loadDatabaseConfig } from "./client.js";
 import { roles, SYSTEM_ROLE_CODES, type SystemRoleCode } from "./schema/roles.js";
 import { permissions } from "./schema/permissions.js";
 import { rolePermissions } from "./schema/rolePermissions.js";
-import { MODULE_03_PERMISSIONS, type Module03PermissionCode } from "./permissionCodes.js";
+import {
+  MODULE_03_PERMISSIONS,
+  MODULE_04_PERMISSIONS,
+  type Module03PermissionCode,
+  type Module04PermissionCode,
+} from "./permissionCodes.js";
 
 const ROLE_NAMES: Record<SystemRoleCode, string> = {
   ADMIN: "Administrator",
@@ -33,20 +38,26 @@ export async function seedRoles(db: ReturnType<typeof drizzle>): Promise<void> {
   await db.insert(roles).values(values).onConflictDoNothing({ target: roles.code });
 }
 
-/** ADMIN gets full Module 03 administrative control; AUDITOR gets read-only visibility, matching its
- *  description. Other roles have no justified Module 03 access yet and are intentionally granted none. */
-const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly Module03PermissionCode[]> = {
-  ADMIN: MODULE_03_PERMISSIONS.map((p) => p.code),
-  AUDITOR: ["users.read", "roles.read", "permissions.read"],
-  INCIDENT_COMMANDER: [],
-  COMMUNICATION_MANAGER: [],
+const ALL_PERMISSIONS = [...MODULE_03_PERMISSIONS, ...MODULE_04_PERMISSIONS];
+type AnyPermissionCode = Module03PermissionCode | Module04PermissionCode;
+
+/**
+ * ADMIN gets full administrative control of every seeded permission. Other roles are granted
+ * only what's justified by their current, already-implemented job — see the module prompts
+ * (claude/prompts/03-users-rbac.md, 04-contacts.md) for the reasoning behind each grant.
+ */
+const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> = {
+  ADMIN: ALL_PERMISSIONS.map((p) => p.code),
+  AUDITOR: ["users.read", "roles.read", "permissions.read", "contacts.read"],
+  INCIDENT_COMMANDER: ["contacts.read"],
+  COMMUNICATION_MANAGER: ["contacts.read", "contacts.create", "contacts.update"],
   RESPONDER: [],
 };
 
 export async function seedPermissions(db: ReturnType<typeof drizzle>): Promise<void> {
   await db
     .insert(permissions)
-    .values(MODULE_03_PERMISSIONS.map(({ code, name, description }) => ({ code, name, description })))
+    .values(ALL_PERMISSIONS.map(({ code, name, description }) => ({ code, name, description })))
     .onConflictDoNothing({ target: permissions.code });
 }
 
@@ -87,7 +98,7 @@ async function main(): Promise<void> {
     await seedPermissions(db);
     await seedRolePermissions(db);
     console.log(
-      `Seed complete: ${SYSTEM_ROLE_CODES.length} system roles, ${MODULE_03_PERMISSIONS.length} permissions ensured.`,
+      `Seed complete: ${SYSTEM_ROLE_CODES.length} system roles, ${ALL_PERMISSIONS.length} permissions ensured.`,
     );
   } finally {
     await seedClient.end({ timeout: 5 });

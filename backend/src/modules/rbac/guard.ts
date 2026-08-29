@@ -1,6 +1,6 @@
 import type { FastifyRequest } from "fastify";
-import { getDb, type Module03PermissionCode } from "@beacon/database";
-import { hasPermission } from "./permissions.js";
+import { getDb } from "@beacon/database";
+import { hasPermission, type PermissionCode } from "./permissions.js";
 import { NOT_AUTHENTICATED, NOT_AUTHORIZED } from "../auth/errors.js";
 
 /**
@@ -14,7 +14,7 @@ import { NOT_AUTHENTICATED, NOT_AUTHORIZED } from "../auth/errors.js";
  *
  *   if (user.role === "ADMIN") { ... }
  */
-export function requirePermission(code: Module03PermissionCode) {
+export function requirePermission(code: PermissionCode) {
   return async function requirePermissionHook(request: FastifyRequest): Promise<void> {
     if (!request.authUser) {
       throw NOT_AUTHENTICATED;

@@ -1,24 +1,30 @@
 {
-  "name": "@beacon/backend",
+  "name": "@beacon/database",
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "generate": "dotenv -e ../.env -- drizzle-kit generate",
+    "migrate": "dotenv -e ../.env -- tsx src/migrate.ts",
+    "seed": "dotenv -e ../.env -- tsx src/seed.ts",
+    "status": "dotenv -e ../.env -- tsx src/status.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@beacon/database": "*",
-    "dotenv": "^17.4.2",
-    "fastify": "^5.2.0"
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
     "@types/node": "^22.10.5",
+    "dotenv": "^17.4.2",
+    "dotenv-cli": "^11.0.0",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.4.2",

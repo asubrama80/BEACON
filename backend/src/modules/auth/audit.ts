@@ -9,15 +9,25 @@ export type AuthAuditEventType =
   | "MFA_DISABLED"
   | "MFA_RECOVERY_CODES_REGENERATED"
   | "RECOVERY_CODE_USED"
-  | "BREAK_GLASS_LOGIN";
+  | "BREAK_GLASS_LOGIN"
+  | "USER_CREATED"
+  | "USER_UPDATED"
+  | "USER_DISABLED"
+  | "USER_ENABLED"
+  | "USER_PASSWORD_RESET"
+  | "USER_ROLE_ASSIGNED"
+  | "USER_ROLE_REMOVED";
 
 export interface RecordAuthEventInput {
   eventType: AuthAuditEventType;
   /** Set for events tied to a known user; omit for e.g. a failed login against an unknown email. */
   actorId?: string;
+  /** The user (or other resource) this action was performed on, if different from the actor. */
+  resourceId?: string;
+  resourceType?: string;
   /**
-   * Safe, non-secret context only (e.g. a failure reason code, an attempted email). Never
-   * passwords, hashes, MFA secrets, OTPs, recovery codes, or raw session tokens.
+   * Safe, non-secret context only (e.g. a failure reason code, an attempted email, a role
+   * code). Never passwords, hashes, MFA secrets, OTPs, recovery codes, or raw session tokens.
    */
   metadata?: Record<string, unknown>;
 }
@@ -27,6 +37,8 @@ export async function recordAuthEvent(db: Database, input: RecordAuthEventInput)
     eventType: input.eventType,
     actorType: input.actorId ? "user" : "system",
     actorId: input.actorId,
+    resourceType: input.resourceType,
+    resourceId: input.resourceId,
     metadata: input.metadata ?? {},
   });
 }

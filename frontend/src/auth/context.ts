@@ -7,6 +7,8 @@ export interface AuthUser {
   status: string;
   isBreakGlass: boolean;
   mfaEnabled: boolean;
+  roles: string[];
+  permissions: string[];
 }
 
 export interface AuthContextValue {

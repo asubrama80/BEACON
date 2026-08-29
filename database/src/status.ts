@@ -2,6 +2,8 @@ import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { loadDatabaseConfig } from "./client.js";
 import { roles } from "./schema/roles.js";
+import { permissions } from "./schema/permissions.js";
+import { rolePermissions } from "./schema/rolePermissions.js";
 
 async function main(): Promise<void> {
   const config = loadDatabaseConfig();
@@ -30,6 +32,12 @@ async function main(): Promise<void> {
 
     const roleRows = await db.select({ code: roles.code }).from(roles);
     console.log(`Seeded roles: ${roleRows.length} (${roleRows.map((r) => r.code).join(", ")})`);
+
+    const permissionRows = await db.select({ code: permissions.code }).from(permissions);
+    console.log(`Seeded permissions: ${permissionRows.length} (${permissionRows.map((p) => p.code).join(", ")})`);
+
+    const rolePermissionRows = await db.select({ id: rolePermissions.id }).from(rolePermissions);
+    console.log(`Role-permission mappings: ${rolePermissionRows.length}`);
   } finally {
     await client.end({ timeout: 5 });
   }

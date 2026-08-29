@@ -5,6 +5,10 @@ export interface AuthenticatedUser {
   status: string;
   isBreakGlass: boolean;
   mfaEnabled: boolean;
+  /** Role codes assigned to this user (Module 03). */
+  roles: string[];
+  /** Effective permission codes — the union of all assigned roles' permissions. Never secrets. */
+  permissions: string[];
 }
 
 declare module "fastify" {

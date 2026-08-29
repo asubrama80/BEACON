@@ -3,6 +3,9 @@ import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { loadDatabaseConfig } from "./client.js";
 import { roles, SYSTEM_ROLE_CODES, type SystemRoleCode } from "./schema/roles.js";
+import { permissions } from "./schema/permissions.js";
+import { rolePermissions } from "./schema/rolePermissions.js";
+import { MODULE_03_PERMISSIONS, type Module03PermissionCode } from "./permissionCodes.js";
 
 const ROLE_NAMES: Record<SystemRoleCode, string> = {
   ADMIN: "Administrator",
@@ -30,6 +33,50 @@ export async function seedRoles(db: ReturnType<typeof drizzle>): Promise<void> {
   await db.insert(roles).values(values).onConflictDoNothing({ target: roles.code });
 }
 
+/** ADMIN gets full Module 03 administrative control; AUDITOR gets read-only visibility, matching its
+ *  description. Other roles have no justified Module 03 access yet and are intentionally granted none. */
+const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly Module03PermissionCode[]> = {
+  ADMIN: MODULE_03_PERMISSIONS.map((p) => p.code),
+  AUDITOR: ["users.read", "roles.read", "permissions.read"],
+  INCIDENT_COMMANDER: [],
+  COMMUNICATION_MANAGER: [],
+  RESPONDER: [],
+};
+
+export async function seedPermissions(db: ReturnType<typeof drizzle>): Promise<void> {
+  await db
+    .insert(permissions)
+    .values(MODULE_03_PERMISSIONS.map(({ code, name, description }) => ({ code, name, description })))
+    .onConflictDoNothing({ target: permissions.code });
+}
+
+export async function seedRolePermissions(db: ReturnType<typeof drizzle>): Promise<void> {
+  const roleRows = await db.select({ id: roles.id, code: roles.code }).from(roles);
+  const permissionRows = await db.select({ id: permissions.id, code: permissions.code }).from(permissions);
+
+  const roleIdByCode = new Map(roleRows.map((r) => [r.code, r.id]));
+  const permissionIdByCode = new Map(permissionRows.map((p) => [p.code, p.id]));
+
+  const values: { roleId: string; permissionId: string }[] = [];
+  for (const [roleCode, permissionCodes] of Object.entries(ROLE_PERMISSION_MAP)) {
+    const roleId = roleIdByCode.get(roleCode);
+    if (!roleId) continue;
+
+    for (const permissionCode of permissionCodes) {
+      const permissionId = permissionIdByCode.get(permissionCode);
+      if (!permissionId) continue;
+      values.push({ roleId, permissionId });
+    }
+  }
+
+  if (values.length > 0) {
+    await db
+      .insert(rolePermissions)
+      .values(values)
+      .onConflictDoNothing({ target: [rolePermissions.roleId, rolePermissions.permissionId] });
+  }
+}
+
 async function main(): Promise<void> {
   const config = loadDatabaseConfig();
   const seedClient = postgres(config.connectionString, { max: 1 });
@@ -37,7 +84,11 @@ async function main(): Promise<void> {
   try {
     const db = drizzle(seedClient);
     await seedRoles(db);
-    console.log(`Seed complete: ${SYSTEM_ROLE_CODES.length} system roles ensured.`);
+    await seedPermissions(db);
+    await seedRolePermissions(db);
+    console.log(
+      `Seed complete: ${SYSTEM_ROLE_CODES.length} system roles, ${MODULE_03_PERMISSIONS.length} permissions ensured.`,
+    );
   } finally {
     await seedClient.end({ timeout: 5 });
   }

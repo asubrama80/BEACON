@@ -8,6 +8,8 @@ import { healthRoutes } from "./routes/health.js";
 import { loadAuthConfig, loadMfaEncryptionKey, type AuthConfig } from "./modules/auth/config.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { AuthError } from "./modules/auth/errors.js";
+import { usersRoutes } from "./modules/users/routes.js";
+import { rbacRoutes } from "./modules/rbac/routes.js";
 
 export interface BuildAppOptions {
   env?: AppEnv;
@@ -31,6 +33,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   app.register((instance) => healthRoutes(instance, env));
   app.register((instance) => authRoutes(instance, { config: authConfig, mfaEncryptionKey }));
+  app.register((instance) => usersRoutes(instance, { config: authConfig }));
+  app.register((instance) => rbacRoutes(instance, { config: authConfig }));
 
   app.setErrorHandler((error: FastifyError | AuthError, request, reply) => {
     if (error instanceof AuthError) {

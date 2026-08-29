@@ -27,8 +27,9 @@ Implementation proceeds **one numbered module at a time**. See [MASTER_CHECKLIST
 
 - **Module 00 — Project Bootstrap: complete.** Repository skeleton, frontend/backend application shells, PostgreSQL dev service, Docker Compose foundation, tooling, and CI-equivalent checks (lint/typecheck/test/build) are in place.
 - **Module 01 — Database Foundation: complete.** PostgreSQL + Drizzle ORM foundation schema (14 core tables), a reusable connection pool, committed migrations, an idempotent system-role seed, and database health reporting on `GET /health`. No business logic (login, RBAC, alert sending, chat, guest verification) yet.
-- **Module 02 — Authentication: complete.** Local email/password login (Argon2id), server-side sessions (HttpOnly + SameSite cookies), CSRF protection, login throttling, TOTP MFA with one-time recovery codes, a local emergency break-glass account, authentication audit events, a `bootstrap-user` CLI, and a minimal login/MFA/logout frontend. No enterprise identity provider (AD/Entra/Okta/LDAP/M365) dependency. See [claude/prompts/02-authentication.md](claude/prompts/02-authentication.md) for the full design. RBAC/authorization is not implemented yet.
-- **Next: Module 03 — Users & RBAC.**
+- **Module 02 — Authentication: complete.** Local email/password login (Argon2id), server-side sessions (HttpOnly + SameSite cookies), CSRF protection, login throttling, TOTP MFA with one-time recovery codes, a local emergency break-glass account, authentication audit events, a `bootstrap-user` CLI, and a minimal login/MFA/logout frontend. No enterprise identity provider (AD/Entra/Okta/LDAP/M365) dependency. See [claude/prompts/02-authentication.md](claude/prompts/02-authentication.md) for the full design.
+- **Module 03 — Users & RBAC: complete.** Permission-based authorization (`requirePermission`, never role-name checks) on top of Module 02's sessions; registered-user administration (list/create/update/disable/enable, role assignment, admin password reset); a last-active-administrator safeguard and break-glass account protection; user/RBAC audit events; and a minimal Users admin frontend, visible only to permitted users. See [claude/prompts/03-users-rbac.md](claude/prompts/03-users-rbac.md) for the full design. Contacts and custom-role administration are not implemented yet.
+- **Next: Module 04 — Contacts.**
 
 ## Prerequisites
 
@@ -74,8 +75,8 @@ With PostgreSQL running (Docker or otherwise) and `DATABASE_URL` configured in `
 
 ```bash
 npm run db:migrate   # apply committed migrations
-npm run db:seed      # idempotently ensure the 5 system roles exist
-npm run db:status     # list applied migrations and seeded roles
+npm run db:seed      # idempotently ensure the 5 system roles + Module 03 permissions exist
+npm run db:status     # list applied migrations, seeded roles, and permissions
 ```
 
 `GET /health` reports database connectivity alongside application status (`{"database": {"connected": true|false}}`) without exposing credentials. See [database/README.md](database/README.md) for schema layout, migration policy, and backup/restore steps.
@@ -86,7 +87,7 @@ npm run db:status     # list applied migrations and seeded roles
 npm run bootstrap-user --workspace backend
 ```
 
-Interactive prompt (never accepts a password via flag/env var). Answer "y" to the break-glass question only for the single local emergency admin account — see [claude/prompts/02-authentication.md](claude/prompts/02-authentication.md) for the full break-glass process, including enrolling MFA immediately afterward.
+Interactive prompt (never accepts a password via flag/env var). Answer "y" to the break-glass question only for the single local emergency admin account — see [claude/prompts/02-authentication.md](claude/prompts/02-authentication.md) for the full break-glass process, including enrolling MFA immediately afterward. You can also assign a role (e.g. `ADMIN`) at creation time — this is the only way to grant the very first administrator, since assigning roles through the API itself requires already being one.
 
 ### Start everything with Docker Compose
 

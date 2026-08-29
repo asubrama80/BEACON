@@ -11,7 +11,7 @@
  */
 import { createInterface } from "node:readline/promises";
 import { eq } from "drizzle-orm";
-import { getDb, closeDb, users } from "@beacon/database";
+import { getDb, closeDb, users, roles, userRoles } from "@beacon/database";
 import { hashPassword } from "../src/modules/auth/password.js";
 import { validatePasswordPolicy } from "../src/modules/auth/passwordPolicy.js";
 import { loadAuthConfig } from "../src/modules/auth/config.js";
@@ -88,6 +88,7 @@ function promptHidden(
 
 async function main(): Promise<void> {
   const config = loadAuthConfig();
+  const db = getDb();
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const interactive = process.stdin.isTTY === true;
 
@@ -99,6 +100,25 @@ async function main(): Promise<void> {
     .trim()
     .toLowerCase();
   const isBreakGlass = breakGlassAnswer === "y" || breakGlassAnswer === "yes";
+
+  // Assigning a role here — bypassing the ordinary /users API entirely — is the only way to
+  // ever grant the very first ADMIN: role assignment through the API requires
+  // `users.roles.assign`, which requires already being an admin. It's also the only way to
+  // give the break-glass account a role at all, since the ordinary API refuses to touch it
+  // once created (see claude/prompts/03-users-rbac.md).
+  const availableRoles = await db.select({ id: roles.id, code: roles.code, name: roles.name }).from(roles);
+  const roleAnswer = (
+    await promptVisible(
+      rl,
+      `Assign a role now? (${availableRoles.map((r) => r.code).join(", ")}; leave blank to skip): `,
+    )
+  )
+    .trim()
+    .toUpperCase();
+  const roleToAssign = roleAnswer ? availableRoles.find((r) => r.code === roleAnswer) : undefined;
+  if (roleAnswer && !roleToAssign) {
+    throw new Error(`Unknown role code: ${roleAnswer}`);
+  }
 
   if (interactive) {
     // Free stdin from readline's control before switching to raw-mode password reading below.
@@ -128,8 +148,6 @@ async function main(): Promise<void> {
     throw new Error(policyResult.reason);
   }
 
-  const db = getDb();
-
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
   if (existing) {
     throw new Error(`A user with email ${email} already exists.`);
@@ -154,8 +172,15 @@ async function main(): Promise<void> {
     .insert(users)
     .values({ email, displayName, passwordHash, isBreakGlass })
     .returning({ id: users.id, email: users.email });
+  if (!created) {
+    throw new Error("User creation failed unexpectedly.");
+  }
 
-  console.log(`\nUser created: ${created?.email} (id: ${created?.id})`);
+  if (roleToAssign) {
+    await db.insert(userRoles).values({ userId: created.id, roleId: roleToAssign.id });
+  }
+
+  console.log(`\nUser created: ${created.email} (id: ${created.id})${roleToAssign ? ` — role: ${roleToAssign.code}` : ""}`);
 
   if (isBreakGlass) {
     console.log(

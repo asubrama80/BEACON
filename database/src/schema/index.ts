@@ -13,3 +13,5 @@ export * from "./auditLogs.js";
 export * from "./sessions.js";
 export * from "./mfaCredentials.js";
 export * from "./mfaRecoveryCodes.js";
+export * from "./permissions.js";
+export * from "./rolePermissions.js";

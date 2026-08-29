@@ -1,7 +1,9 @@
+import { useState } from "react";
 import "./App.css";
 import { AuthProvider } from "./auth/AuthContext";
 import { useAuth } from "./auth/useAuth";
 import LoginPage from "./auth/LoginPage";
+import UsersPage from "./users/UsersPage";
 
 export default function App(): JSX.Element {
   return (
@@ -11,8 +13,11 @@ export default function App(): JSX.Element {
   );
 }
 
+type View = "dashboard" | "users";
+
 function AppShell(): JSX.Element {
   const { user, loading, logout } = useAuth();
+  const [view, setView] = useState<View>("dashboard");
 
   if (loading) {
     return (
@@ -25,6 +30,8 @@ function AppShell(): JSX.Element {
   if (!user) {
     return <LoginPage />;
   }
+
+  const canViewUsers = user.permissions.includes("users.read");
 
   return (
     <div className="app-shell">
@@ -49,6 +56,26 @@ function AppShell(): JSX.Element {
           <h1 className="app-shell-title">BEACON</h1>
           <p className="app-shell-subtitle">Emergency Communication Platform</p>
         </div>
+
+        {canViewUsers && (
+          <nav className="app-shell-nav">
+            <button
+              type="button"
+              className={`app-shell-nav-link ${view === "dashboard" ? "is-active" : ""}`}
+              onClick={() => setView("dashboard")}
+            >
+              Dashboard
+            </button>
+            <button
+              type="button"
+              className={`app-shell-nav-link ${view === "users" ? "is-active" : ""}`}
+              onClick={() => setView("users")}
+            >
+              Users
+            </button>
+          </nav>
+        )}
+
         <div className="app-shell-user">
           <span className="app-shell-user-name">{user.displayName}</span>
           <button type="button" className="app-shell-logout" onClick={() => void logout()}>
@@ -58,10 +85,14 @@ function AppShell(): JSX.Element {
       </header>
 
       <main className="app-shell-main">
-        <div className="app-shell-status-card">
-          <h2>Signed in</h2>
-          <p>Business modules are implemented in later steps.</p>
-        </div>
+        {view === "users" && canViewUsers ? (
+          <UsersPage />
+        ) : (
+          <div className="app-shell-status-card">
+            <h2>Signed in</h2>
+            <p>Business modules are implemented in later steps.</p>
+          </div>
+        )}
       </main>
     </div>
   );

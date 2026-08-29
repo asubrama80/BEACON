@@ -76,8 +76,36 @@
   font-size: 14px;
 }
 
+.app-shell-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.app-shell-nav-link {
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.app-shell-nav-link:hover {
+  background: var(--paper);
+}
+
+.app-shell-nav-link.is-active {
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+}
+
 .app-shell-main {
   flex: 1;
+}
+
+.app-shell-main:has(.app-shell-status-card) {
   display: flex;
   align-items: center;
   justify-content: center;

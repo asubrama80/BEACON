@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { users, mfaCredentials, type Database } from "@beacon/database";
 import type { AuthenticatedUser } from "./types.js";
+import { getEffectivePermissions, getUserRoles } from "../rbac/permissions.js";
 
 export interface UserRecord {
   id: string;
@@ -85,7 +86,12 @@ export async function findPendingMfaCredential(
 }
 
 export async function toAuthenticatedUser(db: Database, user: UserRecord): Promise<AuthenticatedUser> {
-  const active = await findActiveMfaCredential(db, user.id);
+  const [active, roleRows, effectivePermissions] = await Promise.all([
+    findActiveMfaCredential(db, user.id),
+    getUserRoles(db, user.id),
+    getEffectivePermissions(db, user.id),
+  ]);
+
   return {
     id: user.id,
     email: user.email,
@@ -93,5 +99,7 @@ export async function toAuthenticatedUser(db: Database, user: UserRecord): Promi
     status: user.status,
     isBreakGlass: user.isBreakGlass,
     mfaEnabled: Boolean(active),
+    roles: roleRows.map((role) => role.code),
+    permissions: [...effectivePermissions].sort(),
   };
 }

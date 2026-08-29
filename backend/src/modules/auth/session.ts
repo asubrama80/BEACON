@@ -76,6 +76,18 @@ export async function revokeSession(db: Database, sessionId: string): Promise<vo
   await db.update(sessions).set({ revokedAt: new Date() }).where(eq(sessions.id, sessionId));
 }
 
+/**
+ * Revokes every currently-active session for a user — used when disabling a user or resetting
+ * their password (Module 03), so access is cut immediately rather than waiting for expiry.
+ * Re-enabling a user never restores these; a fresh login is required.
+ */
+export async function revokeAllSessionsForUser(db: Database, userId: string): Promise<void> {
+  await db
+    .update(sessions)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)));
+}
+
 /** Constant-time comparison, used for CSRF token checks. */
 export function safeEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a);

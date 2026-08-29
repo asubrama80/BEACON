@@ -4,7 +4,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 
 Work proceeds one module at a time, in order, unless the user directs otherwise. See [CLAUDE.md](CLAUDE.md) for governing rules. Update this file immediately after a module is completed.
 
-- [ ] 00 Project Bootstrap
+- [x] 00 Project Bootstrap
 - [ ] 01 Database Foundation
 - [ ] 02 Authentication
 - [ ] 03 Users & RBAC

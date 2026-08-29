@@ -1,0 +1,27 @@
+:root {
+  --paper: #f5f6f8;
+  --surface: #ffffff;
+  --line: #e1e5ea;
+  --ink: #1b2430;
+  --ink-soft: #5c6673;
+  --brand: #1f4e79;
+  --brand-dark: #173d60;
+  --font-ui:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}

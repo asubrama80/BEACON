@@ -1,0 +1,23 @@
+{
+  "name": "beacon",
+  "private": true,
+  "version": "0.0.0",
+  "description": "BEACON — Emergency Communication & Incident War Room Platform",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "setup": "npm install",
+    "dev": "concurrently -n frontend,backend -c blue,green \"npm run dev --workspace frontend\" \"npm run dev --workspace backend\"",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "dev:backend": "npm run dev --workspace backend",
+    "lint": "npm run lint --workspace frontend && npm run lint --workspace backend",
+    "typecheck": "npm run typecheck --workspace frontend && npm run typecheck --workspace backend",
+    "test": "npm run test --workspace frontend && npm run test --workspace backend",
+    "build": "npm run build --workspace frontend && npm run build --workspace backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

@@ -1,4 +1,5 @@
-import { pgTable, uuid, varchar, text, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, timestamp, index, uniqueIndex, check } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { contacts } from "./contacts.js";
 
 export const groups = pgTable(
@@ -12,7 +13,16 @@ export const groups = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
-  (table) => [uniqueIndex("groups_name_idx").on(table.name)],
+  (table) => [
+    // Case-insensitive uniqueness (Module 06) — "IT Operations" and "it operations" collide —
+    // scoped to non-deleted groups only; disabling a group does NOT free its name for reuse.
+    // The raw `name` column still preserves the operator's original display casing.
+    uniqueIndex("groups_name_lower_unique_idx")
+      .on(sql`lower(${table.name})`)
+      .where(sql`${table.deletedAt} IS NULL`),
+    index("groups_status_idx").on(table.status),
+    check("groups_status_check", sql`${table.status} IN ('active', 'inactive')`),
+  ],
 );
 
 /** Static membership foundation. Dynamic/rule-based groups are a later module. */

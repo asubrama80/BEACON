@@ -5,6 +5,7 @@ import { useAuth } from "./auth/useAuth";
 import LoginPage from "./auth/LoginPage";
 import UsersPage from "./users/UsersPage";
 import ContactsPage from "./contacts/ContactsPage";
+import GroupsPage from "./groups/GroupsPage";
 
 export default function App(): JSX.Element {
   return (
@@ -14,7 +15,7 @@ export default function App(): JSX.Element {
   );
 }
 
-type View = "dashboard" | "users" | "contacts";
+type View = "dashboard" | "users" | "contacts" | "groups";
 
 function AppShell(): JSX.Element {
   const { user, loading, logout } = useAuth();
@@ -34,6 +35,7 @@ function AppShell(): JSX.Element {
 
   const canViewUsers = user.permissions.includes("users.read");
   const canViewContacts = user.permissions.includes("contacts.read");
+  const canViewGroups = user.permissions.includes("groups.read");
 
   return (
     <div className="app-shell">
@@ -59,7 +61,7 @@ function AppShell(): JSX.Element {
           <p className="app-shell-subtitle">Emergency Communication Platform</p>
         </div>
 
-        {(canViewUsers || canViewContacts) && (
+        {(canViewUsers || canViewContacts || canViewGroups) && (
           <nav className="app-shell-nav">
             <button
               type="button"
@@ -75,6 +77,15 @@ function AppShell(): JSX.Element {
                 onClick={() => setView("contacts")}
               >
                 Contacts
+              </button>
+            )}
+            {canViewGroups && (
+              <button
+                type="button"
+                className={`app-shell-nav-link ${view === "groups" ? "is-active" : ""}`}
+                onClick={() => setView("groups")}
+              >
+                Groups
               </button>
             )}
             {canViewUsers && (
@@ -102,6 +113,8 @@ function AppShell(): JSX.Element {
           <UsersPage />
         ) : view === "contacts" && canViewContacts ? (
           <ContactsPage />
+        ) : view === "groups" && canViewGroups ? (
+          <GroupsPage />
         ) : (
           <div className="app-shell-status-card">
             <h2>Signed in</h2>

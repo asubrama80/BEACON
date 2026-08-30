@@ -60,3 +60,25 @@ export const MODULE_05_PERMISSIONS = [
 ] as const;
 
 export type Module05PermissionCode = (typeof MODULE_05_PERMISSIONS)[number]["code"];
+
+/**
+ * Module 06's group-management permission codes. Same convention: seeded once, never renamed,
+ * shared by the seed script and `requirePermission()`.
+ */
+export const MODULE_06_PERMISSIONS = [
+  { code: "groups.read", name: "View groups", description: "List and view BEACON Contact Groups." },
+  { code: "groups.create", name: "Create groups", description: "Create a new Contact Group." },
+  { code: "groups.update", name: "Update groups", description: "Edit a Group's name/description." },
+  {
+    code: "groups.disable",
+    name: "Disable/enable groups",
+    description: "Disable or re-enable a Group's active status.",
+  },
+  {
+    code: "groups.members.manage",
+    name: "Manage group members",
+    description: "Add or remove Contacts from a Group.",
+  },
+] as const;
+
+export type Module06PermissionCode = (typeof MODULE_06_PERMISSIONS)[number]["code"];

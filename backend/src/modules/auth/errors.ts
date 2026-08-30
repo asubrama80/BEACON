@@ -20,7 +20,8 @@ export type AuthErrorCode =
   | "import_file_invalid"
   | "import_mapping_invalid"
   | "import_batch_expired"
-  | "import_batch_not_previewable";
+  | "import_batch_not_previewable"
+  | "duplicate_group_name";
 
 /**
  * A deliberately generic, safe error surfaced to the client — never a stack trace or DB

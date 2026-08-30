@@ -14,6 +14,7 @@ import { rbacRoutes } from "./modules/rbac/routes.js";
 import { contactsRoutes } from "./modules/contacts/routes.js";
 import { loadContactImportConfig, type ContactImportConfig } from "./modules/contactImport/config.js";
 import { contactImportRoutes } from "./modules/contactImport/routes.js";
+import { groupsRoutes } from "./modules/groups/routes.js";
 
 export interface BuildAppOptions {
   env?: AppEnv;
@@ -34,7 +35,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // credentials:true is required so the browser sends/accepts the session and CSRF cookies
   // across the frontend/backend origin split in local dev (Vite on :5173, API on :4000).
   // origin is an explicit allow-list (never "*") because credentials:true forbids a wildcard.
-  app.register(cors, { origin: env.corsOrigin, credentials: true });
+  // methods must be listed explicitly — @fastify/cors defaults to GET,HEAD,POST only, which
+  // silently blocks every real-browser PATCH/DELETE request (discovered live in Module 06 via
+  // Groups' member-removal DELETE route; curl and Fastify's own `inject()` test harness don't
+  // enforce CORS at all, so this had no way to surface until a real browser exercised it).
+  app.register(cors, { origin: env.corsOrigin, credentials: true, methods: ["GET", "HEAD", "POST", "PATCH", "DELETE"] });
   app.register(rateLimit, { global: false });
   // Bounded, in-memory-only multipart handling for Module 05's spreadsheet upload — the byte
   // limit here is the primary defense against an oversized upload consuming memory; the route
@@ -49,6 +54,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.register((instance) => rbacRoutes(instance, { config: authConfig }));
   app.register((instance) => contactsRoutes(instance, { config: authConfig }));
   app.register((instance) => contactImportRoutes(instance, { config: authConfig, importConfig: contactImportConfig }));
+  app.register((instance) => groupsRoutes(instance, { config: authConfig }));
 
   app.setErrorHandler((error: FastifyError | AuthError, request, reply) => {
     if (error instanceof AuthError) {

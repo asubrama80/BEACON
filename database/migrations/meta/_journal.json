@@ -43,6 +43,13 @@
       "when": 1788044977274,
       "tag": "0005_yummy_major_mapleleaf",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788058272869,
+      "tag": "0006_first_mac_gargan",
+      "breakpoints": true
     }
   ]
 }

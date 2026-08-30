@@ -178,4 +178,47 @@ describe("App", () => {
       expect(screen.getByRole("heading", { level: 2, name: "Contacts" })).toBeInTheDocument();
     });
   });
+
+  it("shows Groups navigation for a user with groups.read and can reach the page", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL) => {
+        const path = new URL(String(input)).pathname;
+        if (path === "/auth/me") {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                user: {
+                  id: "55555555-5555-5555-5555-555555555555",
+                  email: "auditor@example.invalid",
+                  displayName: "Auditor User",
+                  status: "active",
+                  isBreakGlass: false,
+                  mfaEnabled: false,
+                  roles: ["AUDITOR"],
+                  permissions: ["groups.read"],
+                },
+              }),
+          });
+        }
+        if (path === "/groups") {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ items: [], total: 0, page: 1, pageSize: 25 }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }),
+    );
+
+    render(<App />);
+
+    const groupsNavButton = await screen.findByRole("button", { name: "Groups" });
+    groupsNavButton.click();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2, name: "Groups" })).toBeInTheDocument();
+    });
+  });
 });

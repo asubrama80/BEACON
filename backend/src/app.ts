@@ -3,6 +3,7 @@ import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
+import formbody from "@fastify/formbody";
 import { closeDb } from "@beacon/database";
 import { loadEnv, type AppEnv } from "./config/env.js";
 import { healthRoutes } from "./routes/health.js";
@@ -21,6 +22,7 @@ import { alertsRoutes } from "./modules/alerts/routes.js";
 import { loadAlertConfig, type AlertConfig } from "./modules/alerts/config.js";
 import { loadNotificationConfig, type NotificationConfig } from "./modules/notifications/config.js";
 import { getSmsProvider, getEmailProvider } from "./modules/notifications/providers/registry.js";
+import { webhooksRoutes } from "./modules/notifications/webhooks/routes.js";
 
 export interface BuildAppOptions {
   env?: AppEnv;
@@ -29,6 +31,8 @@ export interface BuildAppOptions {
   contactImportConfig?: ContactImportConfig;
   alertConfig?: AlertConfig;
   notificationConfig?: NotificationConfig;
+  /** Test-only seam for injecting a synthetic SNS signing certificate — never set in production. */
+  sesFetchCert?: (url: string) => Promise<string>;
 }
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
@@ -62,6 +66,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.register(multipart, {
     limits: { fileSize: contactImportConfig.maxFileSizeBytes, files: 1, fields: 0 },
   });
+  // Only needed for the Twilio status-callback webhook's application/x-www-form-urlencoded body.
+  app.register(formbody);
 
   app.register((instance) => healthRoutes(instance, env));
   app.register((instance) => authRoutes(instance, { config: authConfig, mfaEncryptionKey }));
@@ -72,7 +78,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.register((instance) => groupsRoutes(instance, { config: authConfig }));
   app.register((instance) => templatesRoutes(instance, { config: authConfig }));
   app.register((instance) => incidentsRoutes(instance, { config: authConfig }));
-  app.register((instance) => alertsRoutes(instance, { config: authConfig, alertConfig, notificationConfig }));
+  app.register((instance) => alertsRoutes(instance, { config: authConfig, alertConfig, notificationConfig, nodeEnv: env.nodeEnv }));
+  // Isolated from the rest of the application — no session auth/CSRF, provider-signature
+  // authenticity instead. See claude/prompts/11-delivery-tracking.md, "Webhook routes".
+  app.register((instance) => webhooksRoutes(instance, { notificationConfig, ...(options.sesFetchCert ? { sesFetchCert: options.sesFetchCert } : {}) }));
 
   app.setErrorHandler((error: FastifyError | AuthError, request, reply) => {
     if (error instanceof AuthError) {

@@ -70,6 +70,26 @@ export interface AlertDetailDto extends AlertSummaryDto {
   submittedCount: number;
   submissionFailedCount: number;
   pendingDispatchCount: number;
+  /** Post-submission delivery-tracking summary (Module 11) — safe aggregate counts only. */
+  deliverySummary: DeliverySummaryDto;
+}
+
+/**
+ * Safe aggregate delivery outcome counts — visible to anyone who can already see the Alert
+ * (`alerts.read`); never recipient-level PII. See claude/prompts/11-delivery-tracking.md,
+ * "Alert delivery summary".
+ */
+export interface DeliverySummaryDto {
+  total: number;
+  submissionFailed: number;
+  deliveryPending: number;
+  delivered: number;
+  undelivered: number;
+  bounced: number;
+  failed: number;
+  /** Derived single-label overview — see module doc, "Alert overall delivery status". */
+  overallStatus: "pending" | "in_progress" | "complete" | "partial_failure" | "failed";
+  deliveryCompletedAt: string | null;
 }
 
 export interface AlertRow {
@@ -99,6 +119,7 @@ export interface AlertRow {
   cancelledAt: Date | null;
   sourceContactCount: number;
   sourceGroupCount: number;
+  deliveryCompletedAt: Date | null;
 }
 
 export function toAlertSummaryDto(row: AlertRow): AlertSummaryDto {
@@ -129,11 +150,33 @@ export interface SubmissionCounts {
   pendingDelivery: number;
 }
 
+export interface DeliveryCounts {
+  total: number;
+  submissionFailed: number;
+  deliveryPending: number;
+  delivered: number;
+  undelivered: number;
+  bounced: number;
+  failed: number;
+}
+
+function deriveOverallDeliveryStatus(counts: DeliveryCounts): DeliverySummaryDto["overallStatus"] {
+  const submittedTotal = counts.delivered + counts.undelivered + counts.bounced + counts.failed + counts.deliveryPending;
+  if (submittedTotal === 0) {
+    return counts.submissionFailed > 0 ? "failed" : "pending";
+  }
+  if (counts.deliveryPending > 0) return "in_progress";
+  if (counts.delivered === 0) return "failed";
+  const anyFailureLike = counts.undelivered + counts.bounced + counts.failed > 0;
+  return anyFailureLike ? "partial_failure" : "complete";
+}
+
 export function toAlertDetailDto(
   row: AlertRow,
   sourceContacts: SourceContactRef[] = [],
   sourceGroups: SourceGroupRef[] = [],
   submission: SubmissionCounts = { submitted: 0, submissionFailed: 0, pendingDelivery: 0 },
+  delivery: DeliveryCounts = { total: 0, submissionFailed: 0, deliveryPending: 0, delivered: 0, undelivered: 0, bounced: 0, failed: 0 },
 ): AlertDetailDto {
   return {
     ...toAlertSummaryDto(row),
@@ -149,6 +192,17 @@ export function toAlertDetailDto(
     submittedCount: submission.submitted,
     submissionFailedCount: submission.submissionFailed,
     pendingDispatchCount: submission.pendingDelivery,
+    deliverySummary: {
+      total: delivery.total,
+      submissionFailed: delivery.submissionFailed,
+      deliveryPending: delivery.deliveryPending,
+      delivered: delivery.delivered,
+      undelivered: delivery.undelivered,
+      bounced: delivery.bounced,
+      failed: delivery.failed,
+      overallStatus: deriveOverallDeliveryStatus(delivery),
+      deliveryCompletedAt: row.deliveryCompletedAt ? row.deliveryCompletedAt.toISOString() : null,
+    },
   };
 }
 
@@ -170,6 +224,12 @@ export interface AlertRecipientDto {
   lastErrorSummary: string | null;
   submittedAt: string | null;
   failedAt: string | null;
+  /** Post-submission delivery tracking (Module 11) — meaningful only once status = 'submitted'. */
+  deliveryStatus: string | null;
+  deliveryUpdatedAt: string | null;
+  deliveredAt: string | null;
+  providerDeliveryCode: string | null;
+  deliveryErrorSummary: string | null;
   createdAt: string;
 }
 
@@ -190,6 +250,11 @@ export interface AlertRecipientRow {
   lastErrorSummary: string | null;
   submittedAt: Date | null;
   failedAt: Date | null;
+  deliveryStatus: string | null;
+  deliveryUpdatedAt: Date | null;
+  deliveredAt: Date | null;
+  providerDeliveryCode: string | null;
+  deliveryErrorSummary: string | null;
   createdAt: Date;
 }
 
@@ -203,6 +268,11 @@ export function toAlertRecipientDto(row: AlertRecipientRow): AlertRecipientDto {
     renderedSubject: row.renderedSubject,
     renderedBody: row.renderedBody,
     status: row.status,
+    deliveryStatus: row.deliveryStatus,
+    deliveryUpdatedAt: row.deliveryUpdatedAt ? row.deliveryUpdatedAt.toISOString() : null,
+    deliveredAt: row.deliveredAt ? row.deliveredAt.toISOString() : null,
+    providerDeliveryCode: row.providerDeliveryCode,
+    deliveryErrorSummary: row.deliveryErrorSummary,
     provider: row.provider,
     providerMessageId: row.providerMessageId,
     attemptCount: row.attemptCount,

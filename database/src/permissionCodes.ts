@@ -169,3 +169,20 @@ export const MODULE_10_PERMISSIONS = [
 ] as const;
 
 export type Module10PermissionCode = (typeof MODULE_10_PERMISSIONS)[number]["code"];
+
+/**
+ * Module 11's delivery-tracking permission code. Gates recipient-level delivery EVENT history
+ * (timestamps/error codes per event) as an additional check alongside `alerts.recipients.read`.
+ * The safe aggregate delivery summary on an Alert's detail view needs no new permission — it's
+ * visible to anyone who can already see the Alert (`alerts.read`). See
+ * claude/prompts/11-delivery-tracking.md, "Permissions".
+ */
+export const MODULE_11_PERMISSIONS = [
+  {
+    code: "alerts.delivery.read",
+    name: "View delivery events",
+    description: "View an Alert recipient's detailed post-submission delivery event history.",
+  },
+] as const;
+
+export type Module11PermissionCode = (typeof MODULE_11_PERMISSIONS)[number]["code"];

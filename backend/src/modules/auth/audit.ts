@@ -50,7 +50,8 @@ export type AuthAuditEventType =
   | "ALERT_READY"
   | "ALERT_CANCELLED"
   | "ALERT_DISPATCH_STARTED"
-  | "ALERT_DISPATCH_COMPLETED";
+  | "ALERT_DISPATCH_COMPLETED"
+  | "ALERT_DELIVERY_COMPLETED";
 
 export interface RecordAuthEventInput {
   eventType: AuthAuditEventType;

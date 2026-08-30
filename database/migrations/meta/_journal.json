@@ -78,6 +78,13 @@
       "when": 1788109677055,
       "tag": "0010_woozy_banshee",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788116410628,
+      "tag": "0011_stale_vulcan",
+      "breakpoints": true
     }
   ]
 }

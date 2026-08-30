@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../auth/AuthContext";
 import AlertsPage from "./AlertsPage";
@@ -39,6 +39,18 @@ const DRAFT_ALERT = {
   cancelledAt: null,
 };
 
+const EMPTY_DELIVERY_SUMMARY = {
+  total: 0,
+  submissionFailed: 0,
+  deliveryPending: 0,
+  delivered: 0,
+  undelivered: 0,
+  bounced: 0,
+  failed: 0,
+  overallStatus: "pending" as const,
+  deliveryCompletedAt: null,
+};
+
 const DRAFT_ALERT_DETAIL = {
   ...DRAFT_ALERT,
   template: null,
@@ -53,6 +65,7 @@ const DRAFT_ALERT_DETAIL = {
   submittedCount: 0,
   submissionFailedCount: 0,
   pendingDispatchCount: 0,
+  deliverySummary: EMPTY_DELIVERY_SUMMARY,
 };
 
 function mockRoutes(overrides: Record<string, () => unknown> = {}): void {
@@ -209,7 +222,7 @@ describe("AlertsPage", () => {
     });
   });
 
-  it("shows the submission summary after dispatch, never claiming delivery", async () => {
+  it("shows the submission summary after dispatch, never claiming delivery is complete before evidence exists", async () => {
     mockRoutes({
       [`GET /alerts/${DRAFT_ALERT.id}`]: () => ({
         alert: {
@@ -219,6 +232,7 @@ describe("AlertsPage", () => {
           submittedCount: 2,
           submissionFailedCount: 0,
           pendingDispatchCount: 0,
+          deliverySummary: { ...EMPTY_DELIVERY_SUMMARY, total: 2, deliveryPending: 2, overallStatus: "in_progress" },
         },
       }),
     });
@@ -227,8 +241,146 @@ describe("AlertsPage", () => {
     fireEvent.click(await screen.findByText("Cybersecurity Test Alert"));
 
     await screen.findByText(/2 submitted/);
-    expect(screen.queryByText(/delivered/i)).not.toBeInTheDocument();
+    // The Delivery Tracking section legitimately shows "0 delivered" (a real count, not a claim) —
+    // what must never appear is a false completion claim before any delivery evidence exists.
+    expect(screen.getByText("0 delivered, 2 pending")).toBeInTheDocument();
+    expect(screen.getByText("In progress")).toBeInTheDocument();
+    expect(screen.queryByText("Complete")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Dispatch Alert" })).not.toBeInTheDocument();
+  });
+
+  it("shows a Complete delivery badge only once every submitted recipient has reached delivered", async () => {
+    mockRoutes({
+      [`GET /alerts/${DRAFT_ALERT.id}`]: () => ({
+        alert: {
+          ...DRAFT_ALERT_DETAIL,
+          status: "submitted",
+          eligibleRecipientCount: 2,
+          submittedCount: 2,
+          submissionFailedCount: 0,
+          pendingDispatchCount: 0,
+          deliverySummary: {
+            ...EMPTY_DELIVERY_SUMMARY,
+            total: 2,
+            delivered: 2,
+            overallStatus: "complete",
+            deliveryCompletedAt: "2026-01-01T00:05:00.000Z",
+          },
+        },
+      }),
+    });
+    renderAlertsPage();
+
+    fireEvent.click(await screen.findByText("Cybersecurity Test Alert"));
+
+    await screen.findByText("Complete");
+    expect(screen.getByText("2 delivered")).toBeInTheDocument();
+  });
+
+  const SUBMITTED_RECIPIENT = {
+    id: "77777777-7777-7777-7777-777777777777",
+    contactId: "66666666-6666-6666-6666-666666666666",
+    displayName: "Alex Responder",
+    destination: "+15550001111",
+    channel: "sms",
+    renderedSubject: null,
+    renderedBody: "Hi Alex",
+    status: "submitted",
+    provider: "mock",
+    providerMessageId: "mock-mock-1",
+    attemptCount: 1,
+    lastFailureClass: null,
+    lastErrorCode: null,
+    lastErrorSummary: null,
+    submittedAt: "2026-01-01T00:00:00.000Z",
+    failedAt: null,
+    deliveryStatus: "pending",
+    deliveryUpdatedAt: "2026-01-01T00:00:00.000Z",
+    deliveredAt: null,
+    providerDeliveryCode: null,
+    deliveryErrorSummary: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+
+  it("shows a Recipients tab with delivery status for a user with alerts.recipients.read", async () => {
+    mockRoutes({
+      [`GET /alerts/${DRAFT_ALERT.id}`]: () => ({
+        alert: {
+          ...DRAFT_ALERT_DETAIL,
+          status: "submitted",
+          submittedCount: 1,
+          deliverySummary: { ...EMPTY_DELIVERY_SUMMARY, total: 1, deliveryPending: 1, overallStatus: "in_progress" },
+        },
+      }),
+      [`GET /alerts/${DRAFT_ALERT.id}/recipients`]: () => ({ items: [SUBMITTED_RECIPIENT], total: 1, page: 1, pageSize: 100 }),
+    });
+    renderAlertsPage();
+
+    fireEvent.click(await screen.findByText("Cybersecurity Test Alert"));
+    fireEvent.click(await screen.findByRole("button", { name: "Recipients" }));
+
+    await screen.findByText("Alex Responder");
+    // "submitted" also appears in the Alert-level status badge — scope the check to the
+    // recipient table row so this asserts the recipient's own submission/delivery status cells.
+    const row = screen.getByText("Alex Responder").closest("tr")!;
+    expect(within(row).getByText("submitted")).toBeInTheDocument();
+    expect(within(row).getByText("pending")).toBeInTheDocument();
+  });
+
+  it("hides the Recipients tab for a user without alerts.recipients.read", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL, init?: RequestInit) => {
+        const path = new URL(String(input)).pathname;
+        const method = (init?.method ?? "GET").toUpperCase();
+        if (path === "/auth/me") {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ user: { ...ADMIN_USER, roles: ["COMMUNICATION_MANAGER"], permissions: ["alerts.read", "alerts.dispatch"] } }),
+          });
+        }
+        if (path === "/alerts" && method === "GET") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [DRAFT_ALERT], total: 1, page: 1, pageSize: 25 }) });
+        }
+        if (path === `/alerts/${DRAFT_ALERT.id}` && method === "GET") {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ alert: { ...DRAFT_ALERT_DETAIL, status: "submitted", submittedCount: 1 } }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }),
+    );
+    renderAlertsPage();
+
+    fireEvent.click(await screen.findByText("Cybersecurity Test Alert"));
+    await screen.findByText(/1 submitted/);
+    expect(screen.queryByRole("button", { name: "Recipients" })).not.toBeInTheDocument();
+  });
+
+  it("simulates a mock delivery outcome from the Recipients tab, clearly labeled as development-only", async () => {
+    let simulated = false;
+    mockRoutes({
+      [`GET /alerts/${DRAFT_ALERT.id}`]: () => ({
+        alert: { ...DRAFT_ALERT_DETAIL, status: "submitted", submittedCount: 1 },
+      }),
+      [`GET /alerts/${DRAFT_ALERT.id}/recipients`]: () => ({ items: [SUBMITTED_RECIPIENT], total: 1, page: 1, pageSize: 100 }),
+      [`POST /alerts/${DRAFT_ALERT.id}/recipients/${SUBMITTED_RECIPIENT.id}/mock-delivery`]: () => {
+        simulated = true;
+        return { recipient: { ...SUBMITTED_RECIPIENT, deliveryStatus: "delivered" } };
+      },
+    });
+    renderAlertsPage();
+
+    fireEvent.click(await screen.findByText("Cybersecurity Test Alert"));
+    fireEvent.click(await screen.findByRole("button", { name: "Recipients" }));
+
+    await screen.findByText(/Development\/Mock only/);
+    fireEvent.click(await screen.findByRole("button", { name: "delivered" }));
+
+    await waitFor(() => {
+      expect(simulated).toBe(true);
+    });
   });
 
   it("does not show the Dispatch control for a user without alerts.dispatch", async () => {

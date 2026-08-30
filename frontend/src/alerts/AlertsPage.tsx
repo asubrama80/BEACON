@@ -62,7 +62,8 @@ export default function AlertsPage(): JSX.Element {
       <h2 className="page-heading">Alerts</h2>
       <p className="page-lede">
         Emergency communication plans — prepared, reviewed, and dispatched to the notification provider here.
-        Delivery tracking (what happens after the provider accepts a message) is a later module.
+        Delivery tracking (what happens after the provider accepts a message) is shown on each alert once it has
+        been submitted.
       </p>
 
       <div className="toolbar">

@@ -36,7 +36,9 @@ export type AuthErrorCode =
   | "alert_cancelled"
   | "dispatch_in_progress"
   | "dispatch_already_started"
-  | "no_recipients";
+  | "no_recipients"
+  | "recipient_not_submitted"
+  | "invalid_delivery_status";
 
 /**
  * A deliberately generic, safe error surfaced to the client — never a stack trace or DB

@@ -13,6 +13,7 @@ interface AlertsRoutesOptions {
   config: AuthConfig;
   alertConfig: AlertConfig;
   notificationConfig: NotificationConfig;
+  nodeEnv: string;
 }
 
 const UUID_PATTERN = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
@@ -21,6 +22,26 @@ const idParamSchema = {
   type: "object",
   required: ["id"],
   properties: { id: { type: "string", pattern: UUID_PATTERN } },
+} as const;
+
+const recipientParamSchema = {
+  type: "object",
+  required: ["id", "recipientId"],
+  properties: {
+    id: { type: "string", pattern: UUID_PATTERN },
+    recipientId: { type: "string", pattern: UUID_PATTERN },
+  },
+} as const;
+
+const mockDeliveryBodySchema = {
+  type: "object",
+  required: ["status"],
+  additionalProperties: false,
+  properties: {
+    status: { type: "string", enum: ["delivered", "undelivered", "bounced", "failed"] },
+    errorCode: { type: "string", maxLength: 64 },
+    safeErrorSummary: { type: "string", maxLength: 255 },
+  },
 } as const;
 
 const listQuerySchema = {
@@ -79,7 +100,7 @@ const updateBodySchema = {
 } as const;
 
 export async function alertsRoutes(app: FastifyInstance, opts: AlertsRoutesOptions): Promise<void> {
-  const { config, alertConfig, notificationConfig } = opts;
+  const { config, alertConfig, notificationConfig, nodeEnv } = opts;
   const authenticate = createAuthenticateHook(config);
   const canRead = requirePermission("alerts.read");
   const canCreate = requirePermission("alerts.create");
@@ -88,6 +109,7 @@ export async function alertsRoutes(app: FastifyInstance, opts: AlertsRoutesOptio
   const canCancel = requirePermission("alerts.cancel");
   const canReadRecipients = requirePermission("alerts.recipients.read");
   const canDispatch = requirePermission("alerts.dispatch");
+  const canReadDelivery = requirePermission("alerts.delivery.read");
 
   // Safe, secret-free provider metadata (e.g. "sms: mock") — never credential values. Gated on
   // alerts.dispatch since only an operator who can actually dispatch needs this. See
@@ -199,4 +221,40 @@ export async function alertsRoutes(app: FastifyInstance, opts: AlertsRoutesOptio
       return alertsService.listAlertRecipients(getDb(), id, query);
     },
   );
+
+  // Recipient-level delivery EVENT HISTORY (per-event timestamps/error codes) — an additional
+  // gate on top of alerts.recipients.read, distinct from the safe aggregate deliverySummary
+  // already folded into GET /alerts/:id. See claude/prompts/11-delivery-tracking.md, "Permissions".
+  app.get(
+    "/alerts/:id/recipients/:recipientId/delivery-events",
+    {
+      preHandler: [authenticate, canReadRecipients, canReadDelivery],
+      schema: { params: recipientParamSchema },
+    },
+    async (request) => {
+      const { id, recipientId } = request.params as { id: string; recipientId: string };
+      const items = await alertsService.listRecipientDeliveryEvents(getDb(), id, recipientId);
+      return { items };
+    },
+  );
+
+  // Development/test-only delivery-outcome simulation — performs zero network communication,
+  // never present outside development/test, gated on alerts.dispatch. See
+  // claude/prompts/11-delivery-tracking.md, "Mock delivery simulation".
+  if (nodeEnv !== "production") {
+    app.post(
+      "/alerts/:id/recipients/:recipientId/mock-delivery",
+      {
+        preHandler: [authenticate, canDispatch],
+        schema: { params: recipientParamSchema, body: mockDeliveryBodySchema },
+      },
+      async (request) => {
+        requireCsrf(request, config);
+        const { id, recipientId } = request.params as { id: string; recipientId: string };
+        const body = request.body as alertsService.SimulateMockDeliveryInput;
+        const recipient = await alertsService.simulateMockDelivery(getDb(), id, recipientId, body);
+        return { recipient };
+      },
+    );
+  }
 }

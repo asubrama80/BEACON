@@ -24,6 +24,14 @@ export interface NotificationConfig {
   dispatchConcurrency: number;
   /** Per-provider-call timeout — outbound requests must never hang indefinitely. */
   providerTimeoutMs: number;
+  /**
+   * The externally-visible base URL BEACON is reachable at — used to build the exact webhook
+   * callback URL (`{publicBaseUrl}/webhooks/twilio/status`) both when submitting a Twilio SMS
+   * (Module 10 integration) and when verifying that callback's signature (Module 11). Never
+   * derived from arbitrary proxy headers. See claude/prompts/11-delivery-tracking.md, "Twilio
+   * signature URL".
+   */
+  publicBaseUrl: string;
 }
 
 function readSmsProvider(value: string | undefined): SmsProviderName {
@@ -57,5 +65,6 @@ export function loadNotificationConfig(source: NodeJS.ProcessEnv = process.env):
     retryBaseMs: Number(source.PROVIDER_RETRY_BASE_MS ?? 500),
     dispatchConcurrency: Number(source.PROVIDER_DISPATCH_CONCURRENCY ?? 5),
     providerTimeoutMs: Number(source.PROVIDER_TIMEOUT_MS ?? 10000),
+    publicBaseUrl: source.PUBLIC_BASE_URL ?? "http://localhost:4000",
   };
 }

@@ -27,8 +27,12 @@ function classifyTwilioFailure(httpStatus: number, twilioCode: number | undefine
  * call. Consumes only the immutable Alert Recipient snapshot (destination + rendered body) —
  * never queries a Contact or Template. Never logs the destination or body. See
  * claude/prompts/10-notification-providers.md, "Twilio adapter".
+ *
+ * `statusCallbackUrl`, when provided (Module 11 integration — see
+ * claude/prompts/11-delivery-tracking.md, "Twilio callback architecture"), is passed as Twilio's
+ * `StatusCallback` param so delivery-status webhooks are requested for every submitted message.
  */
-export function createTwilioSmsProvider(credentials: TwilioCredentials, timeoutMs: number): SmsProvider {
+export function createTwilioSmsProvider(credentials: TwilioCredentials, timeoutMs: number, statusCallbackUrl?: string): SmsProvider {
   return {
     name: "twilio",
     async send(request: SmsSendRequest): Promise<ProviderSubmissionResult> {
@@ -36,7 +40,9 @@ export function createTwilioSmsProvider(credentials: TwilioCredentials, timeoutM
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const url = `https://api.twilio.com/2010-04-01/Accounts/${credentials.accountSid}/Messages.json`;
-        const body = new URLSearchParams({ To: request.destination, From: credentials.fromNumber, Body: request.body });
+        const bodyParams: Record<string, string> = { To: request.destination, From: credentials.fromNumber, Body: request.body };
+        if (statusCallbackUrl) bodyParams.StatusCallback = statusCallbackUrl;
+        const body = new URLSearchParams(bodyParams);
         const auth = Buffer.from(`${credentials.accountSid}:${credentials.authToken}`).toString("base64");
 
         const response = await fetch(url, {

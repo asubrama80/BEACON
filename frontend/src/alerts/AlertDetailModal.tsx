@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import Modal from "../components/Modal";
-import { cancelAlert, dispatchAlert, getAlert, getProviderStatus, previewAlert, readyAlert, updateAlert } from "./api";
-import type { AlertDetail, AlertPreview, ProviderStatus } from "./types";
+import {
+  cancelAlert,
+  dispatchAlert,
+  getAlert,
+  getProviderStatus,
+  listAlertRecipients,
+  previewAlert,
+  readyAlert,
+  simulateMockDelivery,
+  updateAlert,
+} from "./api";
+import type { AlertDetail, AlertPreview, AlertRecipient, MockDeliveryStatus, ProviderStatus } from "./types";
 import { listContacts } from "../contacts/api";
 import type { Contact } from "../contacts/types";
 import { listGroups } from "../groups/api";
@@ -14,7 +24,23 @@ interface AlertDetailModalProps {
   onChanged: () => void;
 }
 
-type Tab = "overview" | "audience";
+type Tab = "overview" | "audience" | "recipients";
+
+const DELIVERY_OVERALL_BADGE: Record<string, string> = {
+  pending: "badge-neutral",
+  in_progress: "badge-neutral",
+  complete: "badge-success",
+  partial_failure: "badge-warning",
+  failed: "badge-critical",
+};
+
+const DELIVERY_OVERALL_LABEL: Record<string, string> = {
+  pending: "Pending",
+  in_progress: "In progress",
+  complete: "Complete",
+  partial_failure: "Partial failure",
+  failed: "Failed",
+};
 
 const STATUS_BADGE: Record<string, string> = {
   draft: "badge-neutral",
@@ -37,6 +63,7 @@ export default function AlertDetailModal({ alertId, onClose, onChanged }: AlertD
   const canReady = user?.permissions.includes("alerts.ready") ?? false;
   const canCancel = user?.permissions.includes("alerts.cancel") ?? false;
   const canDispatch = user?.permissions.includes("alerts.dispatch") ?? false;
+  const canReadRecipients = user?.permissions.includes("alerts.recipients.read") ?? false;
 
   const [tab, setTab] = useState<Tab>("overview");
   const [alert, setAlert] = useState<AlertDetail | null>(null);
@@ -210,6 +237,30 @@ export default function AlertDetailModal({ alertId, onClose, onChanged }: AlertD
         </div>
       )}
 
+      {hasSubmissionActivity && (
+        <div className="detail-section">
+          <div className="detail-section-title">Delivery Tracking</div>
+          <span className={`badge ${DELIVERY_OVERALL_BADGE[alert.deliverySummary.overallStatus] ?? "badge-neutral"}`}>
+            {DELIVERY_OVERALL_LABEL[alert.deliverySummary.overallStatus] ?? alert.deliverySummary.overallStatus}
+          </span>
+          <p className="cell-primary" style={{ marginTop: 8 }}>
+            {alert.deliverySummary.delivered} delivered
+            {alert.deliverySummary.deliveryPending > 0 && `, ${alert.deliverySummary.deliveryPending} pending`}
+            {alert.deliverySummary.undelivered > 0 && `, ${alert.deliverySummary.undelivered} undelivered`}
+            {alert.deliverySummary.bounced > 0 && `, ${alert.deliverySummary.bounced} bounced`}
+            {alert.deliverySummary.failed > 0 && `, ${alert.deliverySummary.failed} failed`}
+          </p>
+          <p className="cell-muted">
+            "Delivered" reflects a provider delivery confirmation, not just provider acceptance.
+          </p>
+          {alert.deliverySummary.deliveryCompletedAt && (
+            <p className="cell-muted">
+              Delivery tracking completed {new Date(alert.deliverySummary.deliveryCompletedAt).toLocaleString()}.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="tab-row" style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <button
           type="button"
@@ -225,6 +276,15 @@ export default function AlertDetailModal({ alertId, onClose, onChanged }: AlertD
         >
           Audience
         </button>
+        {canReadRecipients && hasSubmissionActivity && (
+          <button
+            type="button"
+            className={`btn btn-sm ${tab === "recipients" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setTab("recipients")}
+          >
+            Recipients
+          </button>
+        )}
       </div>
 
       {tab === "overview" && (
@@ -411,7 +471,161 @@ export default function AlertDetailModal({ alertId, onClose, onChanged }: AlertD
       {tab === "audience" && (
         <AudienceTab alert={alert} canManage={isDraft && canUpdate} onSaved={() => void refresh().then(() => setPreview(null))} />
       )}
+
+      {tab === "recipients" && (
+        <RecipientsTab alertId={alert.id} channel={alert.channel} canSimulate={canDispatch} onSimulated={() => void refresh()} />
+      )}
     </Modal>
+  );
+}
+
+const SUBMISSION_STATUS_BADGE: Record<string, string> = {
+  pending_delivery: "badge-neutral",
+  claimed: "badge-neutral",
+  dispatching: "badge-neutral",
+  submitted: "badge-success",
+  submission_failed: "badge-critical",
+};
+
+const DELIVERY_STATUS_BADGE: Record<string, string> = {
+  pending: "badge-neutral",
+  delivered: "badge-success",
+  undelivered: "badge-warning",
+  bounced: "badge-warning",
+  failed: "badge-critical",
+};
+
+/** SMS never bounces; Email never carrier-undelivers — mirrors the backend's channel rule. */
+const CHANNEL_MOCK_STATUSES: Record<string, MockDeliveryStatus[]> = {
+  sms: ["delivered", "undelivered", "failed"],
+  email: ["delivered", "bounced", "failed"],
+};
+
+interface RecipientsTabProps {
+  alertId: string;
+  channel: string;
+  canSimulate: boolean;
+  onSimulated: () => void;
+}
+
+function RecipientsTab({ alertId, channel, canSimulate, onSimulated }: RecipientsTabProps): JSX.Element {
+  const [recipients, setRecipients] = useState<AlertRecipient[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const response = await listAlertRecipients(alertId, { pageSize: 100 });
+      setRecipients(response.items);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load recipients.");
+    }
+  }, [alertId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function simulate(recipientId: string, status: MockDeliveryStatus): Promise<void> {
+    setBusyId(recipientId);
+    setError(null);
+    try {
+      await simulateMockDelivery(alertId, recipientId, { status });
+      await load();
+      onSimulated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to simulate delivery.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (error) {
+    return (
+      <p className="error-banner" role="alert">
+        {error}
+      </p>
+    );
+  }
+  if (!recipients) {
+    return <p>Loading…</p>;
+  }
+
+  const showMockControls = canSimulate && import.meta.env.DEV;
+
+  return (
+    <>
+      {showMockControls && (
+        <p className="warning-banner">
+          Development/Mock only — these buttons simulate a provider delivery callback. They never contact a real
+          notification provider and never appear in production.
+        </p>
+      )}
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Recipient</th>
+              <th>Channel</th>
+              <th>Submission</th>
+              <th>Delivery</th>
+              <th>Last update</th>
+              {showMockControls && <th>Simulate delivery</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {recipients.map((r) => {
+              const lastUpdate = r.deliveryUpdatedAt ?? r.submittedAt ?? r.createdAt;
+              return (
+                <tr key={r.id}>
+                  <td className="cell-primary">{r.displayName ?? "—"}</td>
+                  <td className="cell-muted">{r.channel.toUpperCase()}</td>
+                  <td>
+                    <span className={`badge ${SUBMISSION_STATUS_BADGE[r.status] ?? "badge-neutral"}`}>{r.status}</span>
+                  </td>
+                  <td>
+                    {r.deliveryStatus ? (
+                      <span className={`badge ${DELIVERY_STATUS_BADGE[r.deliveryStatus] ?? "badge-neutral"}`}>
+                        {r.deliveryStatus}
+                      </span>
+                    ) : (
+                      <span className="cell-muted">—</span>
+                    )}
+                  </td>
+                  <td className="cell-muted">{new Date(lastUpdate).toLocaleString()}</td>
+                  {showMockControls && (
+                    <td>
+                      {r.status === "submitted" ? (
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {(CHANNEL_MOCK_STATUSES[channel] ?? []).map((status) => (
+                            <button
+                              key={status}
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              disabled={busyId === r.id}
+                              onClick={() => void simulate(r.id, status)}
+                            >
+                              {status}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="cell-muted">—</span>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {recipients.length === 0 && (
+          <div className="empty-state">
+            <p>No recipients.</p>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 

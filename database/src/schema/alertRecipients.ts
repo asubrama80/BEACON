@@ -16,6 +16,11 @@ import { contacts } from "./contacts.js";
  * `provider`/`attempt_count`/`last_*` summarize the latest attempt for convenient display, while
  * full attempt history lives in `notification_dispatch_attempts`. `delivered`/`queued` remain
  * unused, reserved for Module 11.
+ *
+ * Module 11 adds a deliberately SEPARATE `delivery_status` — post-submission tracking is a
+ * distinct concern from `status` (submission outcome). `delivery_status` only ever becomes
+ * meaningful once `status = 'submitted'`; it is never conflated with submission failure. See
+ * claude/prompts/11-delivery-tracking.md, "Submission vs delivery distinction".
  */
 export const alertRecipients = pgTable(
   "alert_recipients",
@@ -41,7 +46,16 @@ export const alertRecipients = pgTable(
     providerMessageId: varchar("provider_message_id", { length: 255 }),
     queuedAt: timestamp("queued_at", { withTimezone: true }).notNull().defaultNow(),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    /** Post-submission delivery tracking (Module 11) — null until the first provider submission. */
+    deliveryStatus: varchar("delivery_status", { length: 32 }),
+    deliveryUpdatedAt: timestamp("delivery_updated_at", { withTimezone: true }),
+    /** Set only when delivery_status becomes 'delivered' — this column existed unused since Module 01. */
     deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    /** Set when delivery_status reaches a failure-ish terminal state (undelivered/bounced/failed). */
+    deliveryFailedAt: timestamp("delivery_failed_at", { withTimezone: true }),
+    providerDeliveryCode: varchar("provider_delivery_code", { length: 64 }),
+    deliveryErrorSummary: varchar("delivery_error_summary", { length: 255 }),
+    /** Submission-failure timestamp (Module 10) — distinct from delivery_failed_at above. */
     failedAt: timestamp("failed_at", { withTimezone: true }),
     errorDetail: text("error_detail"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -69,5 +83,10 @@ export const alertRecipients = pgTable(
       "alert_recipients_last_failure_class_check",
       sql`${table.lastFailureClass} IS NULL OR ${table.lastFailureClass} IN ('transient', 'permanent')`,
     ),
+    check(
+      "alert_recipients_delivery_status_check",
+      sql`${table.deliveryStatus} IS NULL OR ${table.deliveryStatus} IN ('pending', 'delivered', 'undelivered', 'bounced', 'failed')`,
+    ),
+    index("alert_recipients_delivery_status_idx").on(table.deliveryStatus),
   ],
 );

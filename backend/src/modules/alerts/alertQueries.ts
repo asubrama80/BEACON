@@ -41,6 +41,7 @@ const AGGREGATE_COLUMNS = {
   updatedAt: alerts.updatedAt,
   readyAt: alerts.readyAt,
   cancelledAt: alerts.cancelledAt,
+  deliveryCompletedAt: alerts.deliveryCompletedAt,
   sourceContactCount: SOURCE_CONTACT_COUNT,
   sourceGroupCount: SOURCE_GROUP_COUNT,
 } as const;

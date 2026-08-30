@@ -51,6 +51,12 @@ export const alerts = pgTable(
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     readyAt: timestamp("ready_at", { withTimezone: true }),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    /**
+     * Set exactly once, via a conditional UPDATE guard (Module 11) — every `submitted` recipient
+     * has reached a terminal delivery state. A separate concern from `status` (Alert lifecycle/
+     * submission) — see claude/prompts/11-delivery-tracking.md, "Completion detection".
+     */
+    deliveryCompletedAt: timestamp("delivery_completed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

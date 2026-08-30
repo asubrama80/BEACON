@@ -20,7 +20,7 @@ export function getSmsProvider(config: NotificationConfig): SmsProvider {
           "SMS_PROVIDER=twilio requires TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER to be set.",
         );
       }
-      return createTwilioSmsProvider(config.twilio, config.providerTimeoutMs);
+      return createTwilioSmsProvider(config.twilio, config.providerTimeoutMs, `${config.publicBaseUrl}/webhooks/twilio/status`);
     default:
       throw new Error(`Unsupported SMS_PROVIDER: ${config.smsProvider as string}`);
   }

@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { alertRecipients, type Database } from "@beacon/database";
 import type { AlertRecipientRow } from "./dto.js";
 
@@ -19,6 +19,11 @@ const RECIPIENT_COLUMNS = {
   lastErrorSummary: alertRecipients.lastErrorSummary,
   submittedAt: alertRecipients.submittedAt,
   failedAt: alertRecipients.failedAt,
+  deliveryStatus: alertRecipients.deliveryStatus,
+  deliveryUpdatedAt: alertRecipients.deliveryUpdatedAt,
+  deliveredAt: alertRecipients.deliveredAt,
+  providerDeliveryCode: alertRecipients.providerDeliveryCode,
+  deliveryErrorSummary: alertRecipients.deliveryErrorSummary,
   createdAt: alertRecipients.createdAt,
 } as const;
 
@@ -51,4 +56,14 @@ export async function listAlertRecipients(
     .offset((filter.page - 1) * filter.pageSize);
 
   return { items, total };
+}
+
+/** Scoped to a specific Alert — never returns a recipient belonging to a different Alert. */
+export async function findRecipientRow(db: Database, alertId: string, recipientId: string): Promise<AlertRecipientRow | undefined> {
+  const [row] = await db
+    .select(RECIPIENT_COLUMNS)
+    .from(alertRecipients)
+    .where(and(eq(alertRecipients.alertId, alertId), eq(alertRecipients.id, recipientId)))
+    .limit(1);
+  return row;
 }

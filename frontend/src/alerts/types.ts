@@ -49,6 +49,19 @@ export interface SourceGroupRef {
   name: string;
 }
 
+/** Post-submission delivery-tracking summary — safe aggregate counts only, never per-recipient. */
+export interface DeliverySummary {
+  total: number;
+  submissionFailed: number;
+  deliveryPending: number;
+  delivered: number;
+  undelivered: number;
+  bounced: number;
+  failed: number;
+  overallStatus: "pending" | "in_progress" | "complete" | "partial_failure" | "failed";
+  deliveryCompletedAt: string | null;
+}
+
 export interface AlertDetail extends AlertSummary {
   template: TemplateSummaryRef | null;
   templateNameSnapshot: string | null;
@@ -62,6 +75,7 @@ export interface AlertDetail extends AlertSummary {
   submittedCount: number;
   submissionFailedCount: number;
   pendingDispatchCount: number;
+  deliverySummary: DeliverySummary;
 }
 
 export interface AlertsListResponse {
@@ -103,6 +117,12 @@ export interface AlertRecipient {
   lastErrorSummary: string | null;
   submittedAt: string | null;
   failedAt: string | null;
+  /** Post-submission delivery tracking (Module 11) — meaningful only once status = 'submitted'. */
+  deliveryStatus: string | null;
+  deliveryUpdatedAt: string | null;
+  deliveredAt: string | null;
+  providerDeliveryCode: string | null;
+  deliveryErrorSummary: string | null;
   createdAt: string;
 }
 
@@ -112,6 +132,22 @@ export interface AlertRecipientsListResponse {
   page: number;
   pageSize: number;
 }
+
+/** A single normalized delivery event from the recipient's event history — never destination PII. */
+export interface DeliveryEvent {
+  id: string;
+  provider: string;
+  providerMessageId: string;
+  providerEventId: string | null;
+  rawProviderStatus: string;
+  normalizedStatus: string;
+  occurredAt: string;
+  receivedAt: string;
+  providerErrorCode: string | null;
+  safeErrorSummary: string | null;
+}
+
+export type MockDeliveryStatus = "delivered" | "undelivered" | "bounced" | "failed";
 
 export interface DispatchSummary {
   alertId: string;

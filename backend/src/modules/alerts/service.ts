@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { alerts, alertRecipients, type Database, type DbOrTx } from "@beacon/database";
 import { AuthError } from "../auth/errors.js";
@@ -24,7 +25,7 @@ import {
   type ListAlertsFilter,
 } from "./alertQueries.js";
 import { resolveRecipients } from "./recipientResolution.js";
-import { listAlertRecipients as queryAlertRecipients } from "./alertRecipientQueries.js";
+import { listAlertRecipients as queryAlertRecipients, findRecipientRow } from "./alertRecipientQueries.js";
 import {
   toAlertDetailDto,
   toAlertRecipientDto,
@@ -40,6 +41,9 @@ import type { NotificationConfig } from "../notifications/config.js";
 import { getSmsProvider, getEmailProvider } from "../notifications/providers/registry.js";
 import { dispatchRecipients } from "../notifications/dispatchEngine.js";
 import { getPendingRecipients, getRecipientStatusCounts } from "../notifications/dispatchQueries.js";
+import { getDeliverySummary, listDeliveryEventsForRecipient, type DeliveryEventRow } from "../notifications/deliveryQueries.js";
+import { processDeliveryEvent } from "../notifications/deliveryService.js";
+import { isDeliveryStatus, type DeliveryStatus } from "../notifications/deliveryStatus.js";
 
 const TITLE_MAX_LENGTH = 255;
 const SUBJECT_MAX_LENGTH = 255;
@@ -128,16 +132,19 @@ async function loadDto(db: DbOrTx, id: string): Promise<AlertDetailDto> {
   if (!row) {
     throw new AuthError(404, "not_found", "Alert not found.");
   }
-  const [sourceContacts, sourceGroups, counts] = await Promise.all([
+  const [sourceContacts, sourceGroups, counts, delivery] = await Promise.all([
     getContactSelectionSummaries(db, id),
     getGroupSelectionSummaries(db, id),
     getRecipientStatusCounts(db, id),
+    getDeliverySummary(db, id),
   ]);
-  return toAlertDetailDto(row, sourceContacts, sourceGroups, {
-    submitted: counts.submitted,
-    submissionFailed: counts.submissionFailed,
-    pendingDelivery: counts.pendingDelivery,
-  });
+  return toAlertDetailDto(
+    row,
+    sourceContacts,
+    sourceGroups,
+    { submitted: counts.submitted, submissionFailed: counts.submissionFailed, pendingDelivery: counts.pendingDelivery },
+    delivery,
+  );
 }
 
 export interface ListAlertsOptions {
@@ -658,6 +665,97 @@ export async function listAlertRecipients(
   const { page, pageSize } = normalizePagination(options.page, options.pageSize);
   const result = await queryAlertRecipients(db, alertId, { page, pageSize });
   return { items: result.items.map(toAlertRecipientDto), total: result.total, page, pageSize };
+}
+
+/** SMS never bounces; Email never reports carrier-style "undelivered" — see module doc, "Mock delivery tests". */
+const CHANNEL_ALLOWED_DELIVERY_STATUS: Record<string, readonly DeliveryStatus[]> = {
+  sms: ["delivered", "undelivered", "failed"],
+  email: ["delivered", "bounced", "failed"],
+};
+
+export interface SimulateMockDeliveryInput {
+  status: string;
+  errorCode?: string;
+  safeErrorSummary?: string;
+}
+
+/**
+ * Development/test-only delivery-outcome simulation — performs zero network communication and
+ * funnels through the exact same `processDeliveryEvent` used by real webhooks. The route layer
+ * is responsible for disabling this entirely outside development/test and gating it behind
+ * `alerts.dispatch`. See claude/prompts/11-delivery-tracking.md, "Mock delivery simulation".
+ */
+export async function simulateMockDelivery(
+  db: Database,
+  alertId: string,
+  recipientId: string,
+  input: SimulateMockDeliveryInput,
+): Promise<AlertRecipientDto> {
+  if (!isDeliveryStatus(input.status)) {
+    throw new AuthError(400, "invalid_delivery_status", `Status must be one of: delivered, undelivered, bounced, failed.`);
+  }
+  const recipient = await findRecipientRow(db, alertId, recipientId);
+  if (!recipient) {
+    throw new AuthError(404, "not_found", "Recipient not found.");
+  }
+  if (recipient.status !== "submitted" || !recipient.providerMessageId) {
+    throw new AuthError(409, "recipient_not_submitted", "Only a submitted recipient has delivery tracking to simulate.");
+  }
+  const allowed = CHANNEL_ALLOWED_DELIVERY_STATUS[recipient.channel] ?? [];
+  if (!allowed.includes(input.status)) {
+    throw new AuthError(400, "invalid_delivery_status", `${recipient.channel.toUpperCase()} does not support delivery status "${input.status}".`);
+  }
+
+  await processDeliveryEvent(db, {
+    provider: recipient.provider ?? "mock",
+    providerMessageId: recipient.providerMessageId,
+    providerEventId: `mock-sim-${randomUUID()}`,
+    rawProviderStatus: `mock:${input.status}`,
+    normalizedStatus: input.status,
+    occurredAt: new Date(),
+    providerErrorCode: input.errorCode,
+    safeErrorSummary: input.safeErrorSummary,
+  });
+
+  const updated = await findRecipientRow(db, alertId, recipientId);
+  return toAlertRecipientDto(updated!);
+}
+
+export interface DeliveryEventDto {
+  id: string;
+  provider: string;
+  providerMessageId: string;
+  providerEventId: string | null;
+  rawProviderStatus: string;
+  normalizedStatus: string;
+  occurredAt: string;
+  receivedAt: string;
+  providerErrorCode: string | null;
+  safeErrorSummary: string | null;
+}
+
+function toDeliveryEventDto(row: DeliveryEventRow): DeliveryEventDto {
+  return {
+    id: row.id,
+    provider: row.provider,
+    providerMessageId: row.providerMessageId,
+    providerEventId: row.providerEventId,
+    rawProviderStatus: row.rawProviderStatus,
+    normalizedStatus: row.normalizedStatus,
+    occurredAt: row.occurredAt.toISOString(),
+    receivedAt: row.receivedAt.toISOString(),
+    providerErrorCode: row.providerErrorCode,
+    safeErrorSummary: row.safeErrorSummary,
+  };
+}
+
+export async function listRecipientDeliveryEvents(db: Database, alertId: string, recipientId: string): Promise<DeliveryEventDto[]> {
+  const recipient = await findRecipientRow(db, alertId, recipientId);
+  if (!recipient) {
+    throw new AuthError(404, "not_found", "Recipient not found.");
+  }
+  const rows = await listDeliveryEventsForRecipient(db, recipientId);
+  return rows.map(toDeliveryEventDto);
 }
 
 const DISPATCHABLE_FROM: readonly string[] = ["ready", "partially_submitted", "submission_failed"];

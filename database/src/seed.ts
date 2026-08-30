@@ -14,6 +14,7 @@ import {
   MODULE_08_PERMISSIONS,
   MODULE_09_PERMISSIONS,
   MODULE_10_PERMISSIONS,
+  MODULE_11_PERMISSIONS,
   type Module03PermissionCode,
   type Module04PermissionCode,
   type Module05PermissionCode,
@@ -22,6 +23,7 @@ import {
   type Module08PermissionCode,
   type Module09PermissionCode,
   type Module10PermissionCode,
+  type Module11PermissionCode,
 } from "./permissionCodes.js";
 
 const ROLE_NAMES: Record<SystemRoleCode, string> = {
@@ -59,6 +61,7 @@ const ALL_PERMISSIONS = [
   ...MODULE_08_PERMISSIONS,
   ...MODULE_09_PERMISSIONS,
   ...MODULE_10_PERMISSIONS,
+  ...MODULE_11_PERMISSIONS,
 ];
 type AnyPermissionCode =
   | Module03PermissionCode
@@ -68,7 +71,8 @@ type AnyPermissionCode =
   | Module07PermissionCode
   | Module08PermissionCode
   | Module09PermissionCode
-  | Module10PermissionCode;
+  | Module10PermissionCode
+  | Module11PermissionCode;
 
 /**
  * ADMIN gets full administrative control of every seeded permission. Other roles are granted
@@ -92,6 +96,7 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     // "who did what and when" framing) — granted deliberately, not by default; see
     // claude/prompts/09-alert-engine.md, "Permission mapping".
     "alerts.recipients.read",
+    "alerts.delivery.read",
   ],
   INCIDENT_COMMANDER: [
     // users.read is newly justified by Module 08: assigning/changing an Incident's commander
@@ -118,6 +123,7 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "alerts.cancel",
     "alerts.recipients.read",
     "alerts.dispatch",
+    "alerts.delivery.read",
   ],
   COMMUNICATION_MANAGER: [
     "contacts.read",
@@ -143,6 +149,7 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "alerts.cancel",
     "alerts.recipients.read",
     "alerts.dispatch",
+    "alerts.delivery.read",
   ],
   RESPONDER: [
     "incidents.read",

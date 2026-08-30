@@ -2,10 +2,13 @@ import { apiFetch } from "../lib/api";
 import type {
   AlertDetail,
   AlertPreview,
+  AlertRecipient,
   AlertRecipientsListResponse,
   AlertsListResponse,
   ApiErrorBody,
+  DeliveryEvent,
   DispatchSummary,
+  MockDeliveryStatus,
   ProviderStatus,
 } from "./types";
 
@@ -94,9 +97,13 @@ export async function cancelAlert(id: string): Promise<AlertDetail> {
   return body.alert;
 }
 
-export async function listAlertRecipients(id: string, params: { page?: number } = {}): Promise<AlertRecipientsListResponse> {
+export async function listAlertRecipients(
+  id: string,
+  params: { page?: number; pageSize?: number } = {},
+): Promise<AlertRecipientsListResponse> {
   const query = new URLSearchParams();
   if (params.page) query.set("page", String(params.page));
+  if (params.pageSize) query.set("pageSize", String(params.pageSize));
   const response = await apiFetch(`/alerts/${id}/recipients?${query.toString()}`);
   return parseOrThrow<AlertRecipientsListResponse>(response);
 }
@@ -109,4 +116,28 @@ export async function dispatchAlert(id: string): Promise<DispatchSummary> {
 export async function getProviderStatus(): Promise<ProviderStatus> {
   const response = await apiFetch("/alerts/provider-status");
   return parseOrThrow<ProviderStatus>(response);
+}
+
+/** Requires both alerts.recipients.read and alerts.delivery.read — see module doc, "Permissions". */
+export async function listRecipientDeliveryEvents(alertId: string, recipientId: string): Promise<DeliveryEvent[]> {
+  const response = await apiFetch(`/alerts/${alertId}/recipients/${recipientId}/delivery-events`);
+  const body = await parseOrThrow<{ items: DeliveryEvent[] }>(response);
+  return body.items;
+}
+
+/**
+ * Development/test-only delivery-outcome simulation — the route itself is not registered outside
+ * development/test (a production backend returns 404). See module doc, "Mock delivery simulation".
+ */
+export async function simulateMockDelivery(
+  alertId: string,
+  recipientId: string,
+  input: { status: MockDeliveryStatus; errorCode?: string; safeErrorSummary?: string },
+): Promise<AlertRecipient> {
+  const response = await apiFetch(`/alerts/${alertId}/recipients/${recipientId}/mock-delivery`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  const body = await parseOrThrow<{ recipient: AlertRecipient }>(response);
+  return body.recipient;
 }

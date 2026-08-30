@@ -67,6 +67,11 @@ export async function markRecipientSubmitted(db: DbOrTx, recipientId: string, re
       lastFailureClass: null,
       lastErrorCode: null,
       lastErrorSummary: null,
+      // Delivery tracking (Module 11) initializes immediately on successful submission — never
+      // waits for a provider callback to first establish tracking state. See
+      // claude/prompts/11-delivery-tracking.md, "Pending delivery initialization".
+      deliveryStatus: "pending",
+      deliveryUpdatedAt: new Date(),
       updatedAt: new Date(),
     })
     .where(eq(alertRecipients.id, recipientId));

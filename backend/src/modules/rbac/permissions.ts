@@ -16,6 +16,7 @@ import {
   type Module11PermissionCode,
   type Module12PermissionCode,
   type Module13PermissionCode,
+  type Module14PermissionCode,
 } from "@beacon/database";
 
 /** Union of every module's seeded permission codes — extend as each new module adds its own. */
@@ -30,7 +31,8 @@ export type PermissionCode =
   | Module10PermissionCode
   | Module11PermissionCode
   | Module12PermissionCode
-  | Module13PermissionCode;
+  | Module13PermissionCode
+  | Module14PermissionCode;
 
 /**
  * Effective permissions: the UNION of every permission granted by every role assigned to the

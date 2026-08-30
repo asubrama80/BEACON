@@ -69,6 +69,7 @@ describe.skipIf(!process.env.DATABASE_URL)("effective permissions (live database
       "incidents.command_center.read",
       "incidents.read",
       "incidents.timeline.read",
+      "incidents.war_room.read",
       "permissions.read",
       "roles.read",
       "templates.read",
@@ -85,12 +86,12 @@ describe.skipIf(!process.env.DATABASE_URL)("effective permissions (live database
     ]);
 
     const perms = await getEffectivePermissions(db, userId);
-    // AUDITOR grants 13 permissions (Modules 03/04/06/07/08/09/11/12/13); RESPONDER's 6
+    // AUDITOR grants 14 permissions (Modules 03/04/06/07/08/09/11/12/13/14); RESPONDER's 8
     // permissions are almost a subset of AUDITOR's, except RESPONDER also gets
-    // incidents.chat.send (send access AUDITOR deliberately lacks, being read-only) — so the
-    // union is AUDITOR's 13 plus that one extra, 14 total. Never a duplicate (Set already
-    // guarantees this, but assert the count matches too).
-    expect(perms.size).toBe(14);
+    // incidents.chat.send and incidents.war_room.join (send/participate access AUDITOR
+    // deliberately lacks, being read-only) — so the union is AUDITOR's 14 plus those two extras,
+    // 16 total. Never a duplicate (Set already guarantees this, but assert the count too).
+    expect(perms.size).toBe(16);
     expect([...perms].sort()).toEqual([
       "alerts.delivery.read",
       "alerts.read",
@@ -102,6 +103,8 @@ describe.skipIf(!process.env.DATABASE_URL)("effective permissions (live database
       "incidents.command_center.read",
       "incidents.read",
       "incidents.timeline.read",
+      "incidents.war_room.join",
+      "incidents.war_room.read",
       "permissions.read",
       "roles.read",
       "templates.read",
@@ -145,6 +148,9 @@ describe.skipIf(!process.env.DATABASE_URL)("effective permissions (live database
         "incidents.read",
         "incidents.timeline.read",
         "incidents.update",
+        "incidents.war_room.join",
+        "incidents.war_room.manage",
+        "incidents.war_room.read",
         "permissions.read",
         "roles.read",
         "templates.create",

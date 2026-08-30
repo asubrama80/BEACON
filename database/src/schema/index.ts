@@ -14,6 +14,8 @@ export * from "./alertGroupSelections.js";
 export * from "./notificationDispatchAttempts.js";
 export * from "./notificationDeliveryEvents.js";
 export * from "./chatMessages.js";
+export * from "./incidentWarRooms.js";
+export * from "./warRoomSessions.js";
 export * from "./auditLogs.js";
 export * from "./sessions.js";
 export * from "./mfaCredentials.js";

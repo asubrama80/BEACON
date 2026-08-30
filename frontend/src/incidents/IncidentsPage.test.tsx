@@ -22,6 +22,9 @@ const ADMIN_USER = {
     "incidents.command_center.read",
     "incidents.chat.read",
     "incidents.chat.send",
+    "incidents.war_room.read",
+    "incidents.war_room.manage",
+    "incidents.war_room.join",
     "alerts.create",
     "contacts.read",
   ],
@@ -479,6 +482,59 @@ describe("IncidentsPage", () => {
         expect(screen.getByRole("button", { name: "Overview" })).toBeInTheDocument();
       });
       expect(screen.queryByRole("button", { name: "Chat" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("War Room tab", () => {
+    it("shows the War Room tab and its Not-started state when the caller has incidents.war_room.read", async () => {
+      mockRoutes({
+        [`GET /incidents/${OPEN_INCIDENT.id}/war-room`]: () => ({
+          status: "not_started",
+          id: null,
+          openedByDisplayName: null,
+          openedAt: null,
+          endedByDisplayName: null,
+          endedAt: null,
+          activeSessionCount: 0,
+        }),
+        [`GET /incidents/${OPEN_INCIDENT.id}/war-room/sessions`]: () => ({ items: [] }),
+      });
+      renderIncidentsPage();
+
+      fireEvent.click(await screen.findByText("Potential Cybersecurity Incident"));
+      fireEvent.click(await screen.findByRole("button", { name: "War Room" }));
+
+      await screen.findByText("Not started");
+    });
+
+    it("hides the War Room tab for a user without incidents.war_room.read", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: string | URL, init?: RequestInit) => {
+          const path = new URL(String(input)).pathname;
+          const method = (init?.method ?? "GET").toUpperCase();
+          if (path === "/auth/me") {
+            return Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve({ user: { ...ADMIN_USER, permissions: ["incidents.read", "incidents.timeline.read"] } }),
+            });
+          }
+          if (path === "/incidents" && method === "GET") {
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [OPEN_INCIDENT], total: 1, page: 1, pageSize: 25 }) });
+          }
+          if (path === `/incidents/${OPEN_INCIDENT.id}` && method === "GET") {
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ incident: OPEN_INCIDENT }) });
+          }
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+        }),
+      );
+      renderIncidentsPage();
+
+      fireEvent.click(await screen.findByText("Potential Cybersecurity Incident"));
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Overview" })).toBeInTheDocument();
+      });
+      expect(screen.queryByRole("button", { name: "War Room" })).not.toBeInTheDocument();
     });
   });
 });

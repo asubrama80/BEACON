@@ -17,6 +17,7 @@ import {
   MODULE_11_PERMISSIONS,
   MODULE_12_PERMISSIONS,
   MODULE_13_PERMISSIONS,
+  MODULE_14_PERMISSIONS,
   type Module03PermissionCode,
   type Module04PermissionCode,
   type Module05PermissionCode,
@@ -28,6 +29,7 @@ import {
   type Module11PermissionCode,
   type Module12PermissionCode,
   type Module13PermissionCode,
+  type Module14PermissionCode,
 } from "./permissionCodes.js";
 
 const ROLE_NAMES: Record<SystemRoleCode, string> = {
@@ -68,6 +70,7 @@ const ALL_PERMISSIONS = [
   ...MODULE_11_PERMISSIONS,
   ...MODULE_12_PERMISSIONS,
   ...MODULE_13_PERMISSIONS,
+  ...MODULE_14_PERMISSIONS,
 ];
 type AnyPermissionCode =
   | Module03PermissionCode
@@ -80,7 +83,8 @@ type AnyPermissionCode =
   | Module10PermissionCode
   | Module11PermissionCode
   | Module12PermissionCode
-  | Module13PermissionCode;
+  | Module13PermissionCode
+  | Module14PermissionCode;
 
 /**
  * ADMIN gets full administrative control of every seeded permission. Other roles are granted
@@ -107,6 +111,7 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "alerts.delivery.read",
     "incidents.command_center.read",
     "incidents.chat.read",
+    "incidents.war_room.read",
   ],
   INCIDENT_COMMANDER: [
     // users.read is newly justified by Module 08: assigning/changing an Incident's commander
@@ -137,6 +142,9 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "incidents.command_center.read",
     "incidents.chat.read",
     "incidents.chat.send",
+    "incidents.war_room.read",
+    "incidents.war_room.manage",
+    "incidents.war_room.join",
   ],
   COMMUNICATION_MANAGER: [
     "contacts.read",
@@ -166,6 +174,11 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "incidents.command_center.read",
     "incidents.chat.read",
     "incidents.chat.send",
+    // Deliberately read + join only, not manage — mirrors this role's existing exclusion from
+    // incidents.lifecycle.manage; opening/ending the War Room is an Incident Commander-level
+    // operational decision. See claude/prompts/14-war-room-foundation.md, "Permissions".
+    "incidents.war_room.read",
+    "incidents.war_room.join",
   ],
   RESPONDER: [
     "incidents.read",
@@ -180,6 +193,8 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "incidents.command_center.read",
     "incidents.chat.read",
     "incidents.chat.send",
+    "incidents.war_room.read",
+    "incidents.war_room.join",
   ],
 };
 

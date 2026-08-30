@@ -215,3 +215,17 @@ export const MODULE_13_PERMISSIONS = [
 ] as const;
 
 export type Module13PermissionCode = (typeof MODULE_13_PERMISSIONS)[number]["code"];
+
+/**
+ * Module 14's War Room foundation permission codes. `read` and `join` are separate so a role can
+ * see War Room status without being able to participate; `manage` (open/end) is separate again,
+ * mirroring how `incidents.lifecycle.manage` is its own code distinct from `incidents.read`. See
+ * claude/prompts/14-war-room-foundation.md, "Permissions".
+ */
+export const MODULE_14_PERMISSIONS = [
+  { code: "incidents.war_room.read", name: "View war room", description: "View an Incident's War Room status and session list." },
+  { code: "incidents.war_room.manage", name: "Manage war room", description: "Open or end an Incident's War Room." },
+  { code: "incidents.war_room.join", name: "Join war room", description: "Join or leave an Incident's open War Room." },
+] as const;
+
+export type Module14PermissionCode = (typeof MODULE_14_PERMISSIONS)[number]["code"];

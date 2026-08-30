@@ -38,7 +38,9 @@ export type AuthErrorCode =
   | "dispatch_already_started"
   | "no_recipients"
   | "recipient_not_submitted"
-  | "invalid_delivery_status";
+  | "invalid_delivery_status"
+  | "war_room_already_open"
+  | "war_room_not_open";
 
 /**
  * A deliberately generic, safe error surfaced to the client — never a stack trace or DB

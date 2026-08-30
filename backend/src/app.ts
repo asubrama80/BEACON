@@ -25,6 +25,7 @@ import { loadNotificationConfig, type NotificationConfig } from "./modules/notif
 import { getSmsProvider, getEmailProvider } from "./modules/notifications/providers/registry.js";
 import { webhooksRoutes } from "./modules/notifications/webhooks/routes.js";
 import { chatRoutes } from "./modules/chat/routes.js";
+import { warRoomRoutes } from "./modules/warRoom/routes.js";
 
 export interface BuildAppOptions {
   env?: AppEnv;
@@ -89,6 +90,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // authenticity instead. See claude/prompts/11-delivery-tracking.md, "Webhook routes".
   app.register((instance) => webhooksRoutes(instance, { notificationConfig, ...(options.sesFetchCert ? { sesFetchCert: options.sesFetchCert } : {}) }));
   app.register((instance) => chatRoutes(instance, { config: authConfig, corsOrigin: env.corsOrigin }));
+  app.register((instance) => warRoomRoutes(instance, { config: authConfig }));
 
   app.setErrorHandler((error: FastifyError | AuthError, request, reply) => {
     if (error instanceof AuthError) {

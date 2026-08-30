@@ -18,7 +18,7 @@ Work proceeds one module at a time, in order, unless the user directs otherwise.
 - [x] 11 Delivery Tracking
 - [x] 12 Incident Command Center
 - [x] 13 Realtime Incident Chat
-- [ ] 14 War Room Foundation
+- [x] 14 War Room Foundation
 - [ ] 15 Audio/Video
 - [ ] 16 Screen Sharing
 - [ ] 17 Guest Invitations

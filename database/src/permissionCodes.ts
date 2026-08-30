@@ -99,3 +99,35 @@ export const MODULE_07_PERMISSIONS = [
 ] as const;
 
 export type Module07PermissionCode = (typeof MODULE_07_PERMISSIONS)[number]["code"];
+
+/**
+ * Module 08's incident-management permission codes. Same convention: seeded once, never
+ * renamed, shared by the seed script and `requirePermission()`.
+ */
+export const MODULE_08_PERMISSIONS = [
+  { code: "incidents.read", name: "View incidents", description: "List and view BEACON Incidents." },
+  { code: "incidents.create", name: "Create incidents", description: "Create a new Incident." },
+  { code: "incidents.update", name: "Update incidents", description: "Edit an Incident's title/description/severity." },
+  {
+    code: "incidents.lifecycle.manage",
+    name: "Manage incident lifecycle",
+    description: "Activate, resolve, reopen, or close an Incident.",
+  },
+  {
+    code: "incidents.commander.assign",
+    name: "Assign incident commander",
+    description: "Assign or change an Incident's commander.",
+  },
+  {
+    code: "incidents.participants.manage",
+    name: "Manage incident participants",
+    description: "Add or remove Users/Contacts from an Incident's roster.",
+  },
+  {
+    code: "incidents.timeline.read",
+    name: "View incident timeline",
+    description: "View an Incident's operational timeline.",
+  },
+] as const;
+
+export type Module08PermissionCode = (typeof MODULE_08_PERMISSIONS)[number]["code"];

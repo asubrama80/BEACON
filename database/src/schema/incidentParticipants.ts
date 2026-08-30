@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, index, check, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, timestamp, index, uniqueIndex, check, foreignKey } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { incidents } from "./incidents.js";
 import { users } from "./users.js";
@@ -31,6 +31,17 @@ export const incidentParticipants = pgTable(
   },
   (table) => [
     index("incident_participants_incident_id_idx").on(table.incidentId),
+    // Module 08: prevents a User or Contact from having more than one non-removed participant
+    // row on the same Incident — the real duplicate-prevention guarantee (the service layer's
+    // pre-check is only for a clean error message, not the actual safety net). Removing then
+    // re-adding the same identity creates a new row, since the removed one falls outside this
+    // partial index's scope.
+    uniqueIndex("incident_participants_active_user_idx")
+      .on(table.incidentId, table.userId)
+      .where(sql`${table.status} != 'removed' AND ${table.userId} IS NOT NULL`),
+    uniqueIndex("incident_participants_active_contact_idx")
+      .on(table.incidentId, table.contactId)
+      .where(sql`${table.status} != 'removed' AND ${table.contactId} IS NOT NULL`),
     // Explicit short name: the auto-generated name for this FK exceeds PostgreSQL's
     // 63-byte identifier limit and gets silently truncated (surfaced as a NOTICE on migrate).
     foreignKey({

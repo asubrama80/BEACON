@@ -11,11 +11,13 @@ import {
   MODULE_05_PERMISSIONS,
   MODULE_06_PERMISSIONS,
   MODULE_07_PERMISSIONS,
+  MODULE_08_PERMISSIONS,
   type Module03PermissionCode,
   type Module04PermissionCode,
   type Module05PermissionCode,
   type Module06PermissionCode,
   type Module07PermissionCode,
+  type Module08PermissionCode,
 } from "./permissionCodes.js";
 
 const ROLE_NAMES: Record<SystemRoleCode, string> = {
@@ -50,24 +52,53 @@ const ALL_PERMISSIONS = [
   ...MODULE_05_PERMISSIONS,
   ...MODULE_06_PERMISSIONS,
   ...MODULE_07_PERMISSIONS,
+  ...MODULE_08_PERMISSIONS,
 ];
 type AnyPermissionCode =
   | Module03PermissionCode
   | Module04PermissionCode
   | Module05PermissionCode
   | Module06PermissionCode
-  | Module07PermissionCode;
+  | Module07PermissionCode
+  | Module08PermissionCode;
 
 /**
  * ADMIN gets full administrative control of every seeded permission. Other roles are granted
  * only what's justified by their current, already-implemented job — see the module prompts
  * (claude/prompts/03-users-rbac.md, 04-contacts.md, 05-excel-csv-import.md, 06-groups.md,
- * 07-templates.md) for the reasoning behind each grant.
+ * 07-templates.md, 08-incident-management.md) for the reasoning behind each grant.
  */
 const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> = {
   ADMIN: ALL_PERMISSIONS.map((p) => p.code),
-  AUDITOR: ["users.read", "roles.read", "permissions.read", "contacts.read", "groups.read", "templates.read"],
-  INCIDENT_COMMANDER: ["contacts.read", "groups.read", "templates.read"],
+  AUDITOR: [
+    "users.read",
+    "roles.read",
+    "permissions.read",
+    "contacts.read",
+    "groups.read",
+    "templates.read",
+    "incidents.read",
+    "incidents.timeline.read",
+  ],
+  INCIDENT_COMMANDER: [
+    // users.read is newly justified by Module 08: assigning/changing an Incident's commander
+    // requires searching active BEACON Users, which reuses the existing users.read-gated
+    // /users lookup endpoint rather than duplicating it behind a second permission (see
+    // claude/prompts/08-incident-management.md, "Commander vs RBAC distinction"). Module 03
+    // deliberately withheld this because nothing in the role's job justified it *at the time*;
+    // Module 08 gives the role an actual, concrete need.
+    "users.read",
+    "contacts.read",
+    "groups.read",
+    "templates.read",
+    "incidents.read",
+    "incidents.create",
+    "incidents.update",
+    "incidents.lifecycle.manage",
+    "incidents.commander.assign",
+    "incidents.participants.manage",
+    "incidents.timeline.read",
+  ],
   COMMUNICATION_MANAGER: [
     "contacts.read",
     "contacts.create",
@@ -82,8 +113,11 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "templates.create",
     "templates.update",
     "templates.disable",
+    "incidents.read",
+    "incidents.create",
+    "incidents.timeline.read",
   ],
-  RESPONDER: [],
+  RESPONDER: ["incidents.read", "incidents.timeline.read"],
 };
 
 export async function seedPermissions(db: ReturnType<typeof drizzle>): Promise<void> {

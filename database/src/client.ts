@@ -20,6 +20,16 @@ export function loadDatabaseConfig(source: NodeJS.ProcessEnv = process.env): Dat
 
 export type Database = PostgresJsDatabase<typeof schema>;
 
+/**
+ * The transaction-callback parameter type, extracted structurally from `Database["transaction"]`
+ * rather than imported from Drizzle's internals directly — keeps this in sync automatically if
+ * the driver/version changes. Use `DbOrTx` for any query-layer helper that must work identically
+ * whether called with the plain pool (`getDb()`) or inside a `db.transaction(async (tx) => …)`
+ * block (Module 08 introduced the first such helpers, for atomic Incident + timeline + audit writes).
+ */
+export type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
+export type DbOrTx = Database | Tx;
+
 let sqlClient: postgres.Sql | undefined;
 let database: Database | undefined;
 

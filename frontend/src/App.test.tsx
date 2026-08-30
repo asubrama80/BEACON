@@ -264,4 +264,73 @@ describe("App", () => {
       expect(screen.getByRole("heading", { level: 2, name: "Templates" })).toBeInTheDocument();
     });
   });
+
+  it("shows Incidents navigation for a user with incidents.read and can reach the page", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL) => {
+        const path = new URL(String(input)).pathname;
+        if (path === "/auth/me") {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                user: {
+                  id: "77777777-7777-7777-7777-777777777777",
+                  email: "responder@example.invalid",
+                  displayName: "Responder User",
+                  status: "active",
+                  isBreakGlass: false,
+                  mfaEnabled: false,
+                  roles: ["RESPONDER"],
+                  permissions: ["incidents.read", "incidents.timeline.read"],
+                },
+              }),
+          });
+        }
+        if (path === "/incidents") {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ items: [], total: 0, page: 1, pageSize: 25 }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }),
+    );
+
+    render(<App />);
+
+    const incidentsNavButton = await screen.findByRole("button", { name: "Incidents" });
+    incidentsNavButton.click();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2, name: "Incidents" })).toBeInTheDocument();
+    });
+  });
+
+  it("does not show Incidents navigation for a user without incidents.read", async () => {
+    mockAuthMe({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          user: {
+            id: "88888888-9999-9999-9999-999999999999",
+            email: "noaccess@example.invalid",
+            displayName: "No Access User",
+            status: "active",
+            isBreakGlass: false,
+            mfaEnabled: false,
+            roles: [],
+            permissions: [],
+          },
+        }),
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Signed in")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: "Incidents" })).not.toBeInTheDocument();
+  });
 });

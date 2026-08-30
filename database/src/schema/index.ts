@@ -6,6 +6,7 @@ export * from "./templates.js";
 export * from "./incidents.js";
 export * from "./guestInvitations.js";
 export * from "./incidentParticipants.js";
+export * from "./incidentTimelineEvents.js";
 export * from "./alerts.js";
 export * from "./alertRecipients.js";
 export * from "./chatMessages.js";

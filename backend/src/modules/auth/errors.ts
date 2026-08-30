@@ -22,7 +22,10 @@ export type AuthErrorCode =
   | "import_batch_expired"
   | "import_batch_not_previewable"
   | "duplicate_group_name"
-  | "duplicate_template_name";
+  | "duplicate_template_name"
+  | "invalid_transition"
+  | "incident_closed"
+  | "duplicate_participant";
 
 /**
  * A deliberately generic, safe error surfaced to the client — never a stack trace or DB

@@ -1,4 +1,4 @@
-import { auditLogs, type Database } from "@beacon/database";
+import { auditLogs, type DbOrTx } from "@beacon/database";
 
 export type AuthAuditEventType =
   | "LOGIN_SUCCESS"
@@ -33,7 +33,18 @@ export type AuthAuditEventType =
   | "TEMPLATE_CREATED"
   | "TEMPLATE_UPDATED"
   | "TEMPLATE_DISABLED"
-  | "TEMPLATE_ENABLED";
+  | "TEMPLATE_ENABLED"
+  | "INCIDENT_CREATED"
+  | "INCIDENT_UPDATED"
+  | "INCIDENT_SEVERITY_CHANGED"
+  | "INCIDENT_ACTIVATED"
+  | "INCIDENT_RESOLVED"
+  | "INCIDENT_REOPENED"
+  | "INCIDENT_CLOSED"
+  | "INCIDENT_COMMANDER_ASSIGNED"
+  | "INCIDENT_COMMANDER_CHANGED"
+  | "INCIDENT_PARTICIPANT_ADDED"
+  | "INCIDENT_PARTICIPANT_REMOVED";
 
 export interface RecordAuthEventInput {
   eventType: AuthAuditEventType;
@@ -42,6 +53,8 @@ export interface RecordAuthEventInput {
   /** The user (or other resource) this action was performed on, if different from the actor. */
   resourceId?: string;
   resourceType?: string;
+  /** Set for any event that happened in the context of a specific Incident (Module 08). */
+  incidentId?: string;
   /**
    * Safe, non-secret context only (e.g. a failure reason code, an attempted email, a role
    * code). Never passwords, hashes, MFA secrets, OTPs, recovery codes, or raw session tokens.
@@ -49,13 +62,14 @@ export interface RecordAuthEventInput {
   metadata?: Record<string, unknown>;
 }
 
-export async function recordAuthEvent(db: Database, input: RecordAuthEventInput): Promise<void> {
+export async function recordAuthEvent(db: DbOrTx, input: RecordAuthEventInput): Promise<void> {
   await db.insert(auditLogs).values({
     eventType: input.eventType,
     actorType: input.actorId ? "user" : "system",
     actorId: input.actorId,
     resourceType: input.resourceType,
     resourceId: input.resourceId,
+    incidentId: input.incidentId,
     metadata: input.metadata ?? {},
   });
 }

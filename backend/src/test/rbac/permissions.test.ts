@@ -62,6 +62,8 @@ describe.skipIf(!process.env.DATABASE_URL)("effective permissions (live database
     expect([...perms].sort()).toEqual([
       "contacts.read",
       "groups.read",
+      "incidents.read",
+      "incidents.timeline.read",
       "permissions.read",
       "roles.read",
       "templates.read",
@@ -78,13 +80,16 @@ describe.skipIf(!process.env.DATABASE_URL)("effective permissions (live database
     ]);
 
     const perms = await getEffectivePermissions(db, userId);
-    // AUDITOR grants 6 permissions (Modules 03/04/06/07); RESPONDER grants none — union should
-    // equal AUDITOR's set exactly, and never contain a duplicate (Set already guarantees this,
-    // but assert the count matches too).
-    expect(perms.size).toBe(6);
+    // AUDITOR grants 8 permissions (Modules 03/04/06/07/08); RESPONDER grants a strict subset
+    // of those 8 (incidents.read + incidents.timeline.read) — union should equal AUDITOR's set
+    // exactly, and never contain a duplicate (Set already guarantees this, but assert the count
+    // matches too).
+    expect(perms.size).toBe(8);
     expect([...perms].sort()).toEqual([
       "contacts.read",
       "groups.read",
+      "incidents.read",
+      "incidents.timeline.read",
       "permissions.read",
       "roles.read",
       "templates.read",
@@ -110,6 +115,13 @@ describe.skipIf(!process.env.DATABASE_URL)("effective permissions (live database
         "groups.members.manage",
         "groups.read",
         "groups.update",
+        "incidents.commander.assign",
+        "incidents.create",
+        "incidents.lifecycle.manage",
+        "incidents.participants.manage",
+        "incidents.read",
+        "incidents.timeline.read",
+        "incidents.update",
         "permissions.read",
         "roles.read",
         "templates.create",

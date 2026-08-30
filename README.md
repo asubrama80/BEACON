@@ -32,7 +32,8 @@ Implementation proceeds **one numbered module at a time**. See [MASTER_CHECKLIST
 - **Module 04 — Contacts: complete.** The BEACON contact directory — people BEACON can reach who are never automatically application users. Email/phone normalization, non-blocking duplicate detection with explicit override, active/inactive lifecycle (no hard delete), permission-based CRUD (`contacts.read/create/update/disable`), contact audit events, and a minimal Contacts admin frontend. See [claude/prompts/04-contacts.md](claude/prompts/04-contacts.md) for the full design. CSV/Excel import, Groups, and alert sending are not implemented yet.
 - **Module 05 — Excel/CSV Import: complete.** Operator-reviewed bulk Contact import from CSV or XLSX: upload → map columns → preview (validation/normalization/duplicate detection, reusing Module 04's own logic) → operator decision → confirm → summary/audit. Uploading or previewing a file never creates a Contact; only an explicit confirm of operator-selected rows does. Permission-gated (`contacts.import`), safe file parsing (no formula/macro execution, bounded size/rows/columns), and a 5-step import wizard on the Contacts screen. See [claude/prompts/05-excel-csv-import.md](claude/prompts/05-excel-csv-import.md) for the full design. Groups and alert sending are not implemented yet.
 - **Module 06 — Groups: complete.** Static, reusable Contact Groups: create/edit/disable/enable a Group, and bulk add/remove/list its membership. Membership is Contact-only — no nested Groups, no dynamic/rule-based membership, no dependency on an external directory. Case-insensitive Group-name uniqueness, `memberCount`/`activeMemberCount` on every Group, inactive Contacts remain historical members and are never silently hidden, permission-gated (`groups.read/create/update/disable/members.manage`), and a card-grid Groups screen with a member-management modal. See [claude/prompts/06-groups.md](claude/prompts/06-groups.md) for the full design. Alert sending and Templates are not implemented yet.
-- **Next: Module 07 — Templates.**
+- **Module 07 — Templates: complete.** Reusable SMS/Email message content, safe token-only placeholder substitution (`{{firstName}}`/`{{lastName}}`/`{{displayName}}`, no executable syntax), a synthetic-values preview with SMS GSM-7/UCS-2 segment guidance, and create/edit/disable/enable lifecycle. A Template never identifies recipients or sends anything — that's Module 09's job. Permission-gated (`templates.read/create/update/disable`), and a card-grid Templates screen with an inline preview. See [claude/prompts/07-templates.md](claude/prompts/07-templates.md) for the full design. Incident Management and the Alert Engine are not implemented yet.
+- **Next: Module 08 — Incident Management.**
 
 ## Prerequisites
 
@@ -78,7 +79,7 @@ With PostgreSQL running (Docker or otherwise) and `DATABASE_URL` configured in `
 
 ```bash
 npm run db:migrate   # apply committed migrations
-npm run db:seed      # idempotently ensure the 5 system roles + Module 03/04/05/06 permissions exist
+npm run db:seed      # idempotently ensure the 5 system roles + Module 03/04/05/06/07 permissions exist
 npm run db:status     # list applied migrations, seeded roles, and permissions
 ```
 

@@ -6,6 +6,7 @@ import LoginPage from "./auth/LoginPage";
 import UsersPage from "./users/UsersPage";
 import ContactsPage from "./contacts/ContactsPage";
 import GroupsPage from "./groups/GroupsPage";
+import TemplatesPage from "./templates/TemplatesPage";
 
 export default function App(): JSX.Element {
   return (
@@ -15,7 +16,7 @@ export default function App(): JSX.Element {
   );
 }
 
-type View = "dashboard" | "users" | "contacts" | "groups";
+type View = "dashboard" | "users" | "contacts" | "groups" | "templates";
 
 function AppShell(): JSX.Element {
   const { user, loading, logout } = useAuth();
@@ -36,6 +37,7 @@ function AppShell(): JSX.Element {
   const canViewUsers = user.permissions.includes("users.read");
   const canViewContacts = user.permissions.includes("contacts.read");
   const canViewGroups = user.permissions.includes("groups.read");
+  const canViewTemplates = user.permissions.includes("templates.read");
 
   return (
     <div className="app-shell">
@@ -61,7 +63,7 @@ function AppShell(): JSX.Element {
           <p className="app-shell-subtitle">Emergency Communication Platform</p>
         </div>
 
-        {(canViewUsers || canViewContacts || canViewGroups) && (
+        {(canViewUsers || canViewContacts || canViewGroups || canViewTemplates) && (
           <nav className="app-shell-nav">
             <button
               type="button"
@@ -86,6 +88,15 @@ function AppShell(): JSX.Element {
                 onClick={() => setView("groups")}
               >
                 Groups
+              </button>
+            )}
+            {canViewTemplates && (
+              <button
+                type="button"
+                className={`app-shell-nav-link ${view === "templates" ? "is-active" : ""}`}
+                onClick={() => setView("templates")}
+              >
+                Templates
               </button>
             )}
             {canViewUsers && (
@@ -115,6 +126,8 @@ function AppShell(): JSX.Element {
           <ContactsPage />
         ) : view === "groups" && canViewGroups ? (
           <GroupsPage />
+        ) : view === "templates" && canViewTemplates ? (
+          <TemplatesPage />
         ) : (
           <div className="app-shell-status-card">
             <h2>Signed in</h2>

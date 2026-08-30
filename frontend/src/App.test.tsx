@@ -221,4 +221,47 @@ describe("App", () => {
       expect(screen.getByRole("heading", { level: 2, name: "Groups" })).toBeInTheDocument();
     });
   });
+
+  it("shows Templates navigation for a user with templates.read and can reach the page", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL) => {
+        const path = new URL(String(input)).pathname;
+        if (path === "/auth/me") {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                user: {
+                  id: "66666666-6666-6666-6666-666666666666",
+                  email: "commmanager@example.invalid",
+                  displayName: "Comm Manager",
+                  status: "active",
+                  isBreakGlass: false,
+                  mfaEnabled: false,
+                  roles: ["COMMUNICATION_MANAGER"],
+                  permissions: ["templates.read", "templates.create"],
+                },
+              }),
+          });
+        }
+        if (path === "/templates") {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ items: [], total: 0, page: 1, pageSize: 25 }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }),
+    );
+
+    render(<App />);
+
+    const templatesNavButton = await screen.findByRole("button", { name: "Templates" });
+    templatesNavButton.click();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2, name: "Templates" })).toBeInTheDocument();
+    });
+  });
 });

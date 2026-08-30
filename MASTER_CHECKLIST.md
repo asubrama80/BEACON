@@ -11,7 +11,7 @@ Work proceeds one module at a time, in order, unless the user directs otherwise.
 - [x] 04 Contacts
 - [x] 05 Excel/CSV Import
 - [x] 06 Groups
-- [ ] 07 Templates
+- [x] 07 Templates
 - [ ] 08 Incident Management
 - [ ] 09 Alert Engine
 - [ ] 10 Notification Providers

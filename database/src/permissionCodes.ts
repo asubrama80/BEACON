@@ -82,3 +82,20 @@ export const MODULE_06_PERMISSIONS = [
 ] as const;
 
 export type Module06PermissionCode = (typeof MODULE_06_PERMISSIONS)[number]["code"];
+
+/**
+ * Module 07's template-management permission codes. Same convention: seeded once, never
+ * renamed, shared by the seed script and `requirePermission()`.
+ */
+export const MODULE_07_PERMISSIONS = [
+  { code: "templates.read", name: "View templates", description: "List and view BEACON message Templates." },
+  { code: "templates.create", name: "Create templates", description: "Create a new message Template." },
+  { code: "templates.update", name: "Update templates", description: "Edit a Template's content." },
+  {
+    code: "templates.disable",
+    name: "Disable/enable templates",
+    description: "Disable or re-enable a Template's active status.",
+  },
+] as const;
+
+export type Module07PermissionCode = (typeof MODULE_07_PERMISSIONS)[number]["code"];

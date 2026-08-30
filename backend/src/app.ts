@@ -15,6 +15,7 @@ import { contactsRoutes } from "./modules/contacts/routes.js";
 import { loadContactImportConfig, type ContactImportConfig } from "./modules/contactImport/config.js";
 import { contactImportRoutes } from "./modules/contactImport/routes.js";
 import { groupsRoutes } from "./modules/groups/routes.js";
+import { templatesRoutes } from "./modules/templates/routes.js";
 
 export interface BuildAppOptions {
   env?: AppEnv;
@@ -55,6 +56,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.register((instance) => contactsRoutes(instance, { config: authConfig }));
   app.register((instance) => contactImportRoutes(instance, { config: authConfig, importConfig: contactImportConfig }));
   app.register((instance) => groupsRoutes(instance, { config: authConfig }));
+  app.register((instance) => templatesRoutes(instance, { config: authConfig }));
 
   app.setErrorHandler((error: FastifyError | AuthError, request, reply) => {
     if (error instanceof AuthError) {

@@ -29,7 +29,11 @@ export type AuthAuditEventType =
   | "GROUP_DISABLED"
   | "GROUP_ENABLED"
   | "GROUP_MEMBER_ADDED"
-  | "GROUP_MEMBER_REMOVED";
+  | "GROUP_MEMBER_REMOVED"
+  | "TEMPLATE_CREATED"
+  | "TEMPLATE_UPDATED"
+  | "TEMPLATE_DISABLED"
+  | "TEMPLATE_ENABLED";
 
 export interface RecordAuthEventInput {
   eventType: AuthAuditEventType;

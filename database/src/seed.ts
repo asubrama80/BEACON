@@ -10,10 +10,12 @@ import {
   MODULE_04_PERMISSIONS,
   MODULE_05_PERMISSIONS,
   MODULE_06_PERMISSIONS,
+  MODULE_07_PERMISSIONS,
   type Module03PermissionCode,
   type Module04PermissionCode,
   type Module05PermissionCode,
   type Module06PermissionCode,
+  type Module07PermissionCode,
 } from "./permissionCodes.js";
 
 const ROLE_NAMES: Record<SystemRoleCode, string> = {
@@ -47,19 +49,25 @@ const ALL_PERMISSIONS = [
   ...MODULE_04_PERMISSIONS,
   ...MODULE_05_PERMISSIONS,
   ...MODULE_06_PERMISSIONS,
+  ...MODULE_07_PERMISSIONS,
 ];
-type AnyPermissionCode = Module03PermissionCode | Module04PermissionCode | Module05PermissionCode | Module06PermissionCode;
+type AnyPermissionCode =
+  | Module03PermissionCode
+  | Module04PermissionCode
+  | Module05PermissionCode
+  | Module06PermissionCode
+  | Module07PermissionCode;
 
 /**
  * ADMIN gets full administrative control of every seeded permission. Other roles are granted
  * only what's justified by their current, already-implemented job — see the module prompts
- * (claude/prompts/03-users-rbac.md, 04-contacts.md, 05-excel-csv-import.md, 06-groups.md) for
- * the reasoning behind each grant.
+ * (claude/prompts/03-users-rbac.md, 04-contacts.md, 05-excel-csv-import.md, 06-groups.md,
+ * 07-templates.md) for the reasoning behind each grant.
  */
 const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> = {
   ADMIN: ALL_PERMISSIONS.map((p) => p.code),
-  AUDITOR: ["users.read", "roles.read", "permissions.read", "contacts.read", "groups.read"],
-  INCIDENT_COMMANDER: ["contacts.read", "groups.read"],
+  AUDITOR: ["users.read", "roles.read", "permissions.read", "contacts.read", "groups.read", "templates.read"],
+  INCIDENT_COMMANDER: ["contacts.read", "groups.read", "templates.read"],
   COMMUNICATION_MANAGER: [
     "contacts.read",
     "contacts.create",
@@ -70,6 +78,10 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "groups.update",
     "groups.disable",
     "groups.members.manage",
+    "templates.read",
+    "templates.create",
+    "templates.update",
+    "templates.disable",
   ],
   RESPONDER: [],
 };

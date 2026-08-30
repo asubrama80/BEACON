@@ -1,6 +1,7 @@
 import { apiFetch } from "../lib/api";
 import type {
   ApiErrorBody,
+  CommandCenter,
   Incident,
   IncidentSeverity,
   IncidentsListResponse,
@@ -109,6 +110,11 @@ export async function removeParticipant(id: string, participantId: string): Prom
     const body = (await response.json().catch(() => ({}))) as ApiErrorBody;
     throw new Error(body.message ?? "Unable to remove this participant.");
   }
+}
+
+export async function getCommandCenter(id: string): Promise<CommandCenter> {
+  const response = await apiFetch(`/incidents/${id}/command-center`);
+  return parseOrThrow<CommandCenter>(response);
 }
 
 export async function listTimeline(

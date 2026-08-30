@@ -5,6 +5,7 @@ import { createAuthenticateHook } from "../auth/plugin.js";
 import { requireCsrf } from "../auth/csrf.js";
 import { requirePermission } from "../rbac/guard.js";
 import * as incidentsService from "./service.js";
+import { getCommandCenter } from "./commandCenterService.js";
 
 interface IncidentsRoutesOptions {
   config: AuthConfig;
@@ -113,6 +114,7 @@ export async function incidentsRoutes(app: FastifyInstance, opts: IncidentsRoute
   // both incidents.read AND contacts.read — never just incidents.read alone. Mirrors Module 06's
   // Group-member dual-gate for the identical reason.
   const canReadContacts = requirePermission("contacts.read");
+  const canReadCommandCenter = requirePermission("incidents.command_center.read");
 
   app.get(
     "/incidents",
@@ -272,6 +274,17 @@ export async function incidentsRoutes(app: FastifyInstance, opts: IncidentsRoute
       const { id, participantId } = request.params as { id: string; participantId: string };
       await incidentsService.removeParticipant(getDb(), id, participantId, request.authUser!.id);
       reply.status(204).send();
+    },
+  );
+
+  // Read-only aggregate projection over existing Module 08-11 data — never a parallel incident/
+  // alert/delivery status model. See claude/prompts/12-incident-command-center.md.
+  app.get(
+    "/incidents/:id/command-center",
+    { preHandler: [authenticate, canReadCommandCenter], schema: { params: idParamSchema } },
+    async (request) => {
+      const { id } = request.params as { id: string };
+      return getCommandCenter(getDb(), id);
     },
   );
 

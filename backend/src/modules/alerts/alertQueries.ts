@@ -113,6 +113,70 @@ export async function listAlerts(db: Database, filter: ListAlertsFilter): Promis
   return { items, total };
 }
 
+export interface IncidentAlertStatusCounts {
+  total: number;
+  draft: number;
+  ready: number;
+  dispatching: number;
+  submitted: number;
+  partiallySubmitted: number;
+  submissionFailed: number;
+  cancelled: number;
+}
+
+/**
+ * Safe aggregate Alert-status counts for one Incident — used by Module 12's Command Center. Never
+ * touches recipient rows or destination PII; purely a `GROUP BY alerts.status` count. See
+ * claude/prompts/12-incident-command-center.md, "Alert communication summary".
+ */
+export async function getIncidentAlertStatusCounts(db: DbOrTx, incidentId: string): Promise<IncidentAlertStatusCounts> {
+  const rows = await db
+    .select({ status: alerts.status, count: sql<number>`count(*)::int` })
+    .from(alerts)
+    .where(eq(alerts.incidentId, incidentId))
+    .groupBy(alerts.status);
+
+  const counts: IncidentAlertStatusCounts = {
+    total: 0,
+    draft: 0,
+    ready: 0,
+    dispatching: 0,
+    submitted: 0,
+    partiallySubmitted: 0,
+    submissionFailed: 0,
+    cancelled: 0,
+  };
+  for (const row of rows) {
+    counts.total += row.count;
+    switch (row.status) {
+      case "draft":
+        counts.draft += row.count;
+        break;
+      case "ready":
+        counts.ready += row.count;
+        break;
+      case "dispatching":
+        counts.dispatching += row.count;
+        break;
+      case "submitted":
+        counts.submitted += row.count;
+        break;
+      case "partially_submitted":
+        counts.partiallySubmitted += row.count;
+        break;
+      case "submission_failed":
+        counts.submissionFailed += row.count;
+        break;
+      case "cancelled":
+        counts.cancelled += row.count;
+        break;
+      default:
+        break;
+    }
+  }
+  return counts;
+}
+
 export async function findAlertById(db: DbOrTx, id: string): Promise<AlertRow | undefined> {
   const [row] = await db
     .select(AGGREGATE_COLUMNS)

@@ -23,6 +23,12 @@ type View = "dashboard" | "users" | "contacts" | "groups" | "templates" | "incid
 function AppShell(): JSX.Element {
   const { user, loading, logout } = useAuth();
   const [view, setView] = useState<View>("dashboard");
+  const [alertsDeepLink, setAlertsDeepLink] = useState<{ alertId?: string; createIncidentId?: string } | null>(null);
+
+  function navigateToAlerts(request: { alertId?: string; createIncidentId?: string }): void {
+    setAlertsDeepLink(request);
+    setView("alerts");
+  }
 
   if (loading) {
     return (
@@ -145,9 +151,9 @@ function AppShell(): JSX.Element {
         {view === "users" && canViewUsers ? (
           <UsersPage />
         ) : view === "incidents" && canViewIncidents ? (
-          <IncidentsPage />
+          <IncidentsPage onNavigateToAlerts={canViewAlerts ? navigateToAlerts : undefined} />
         ) : view === "alerts" && canViewAlerts ? (
-          <AlertsPage />
+          <AlertsPage deepLink={alertsDeepLink} onDeepLinkHandled={() => setAlertsDeepLink(null)} />
         ) : view === "contacts" && canViewContacts ? (
           <ContactsPage />
         ) : view === "groups" && canViewGroups ? (

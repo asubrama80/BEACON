@@ -19,8 +19,28 @@ const ADMIN_USER = {
     "incidents.commander.assign",
     "incidents.participants.manage",
     "incidents.timeline.read",
+    "incidents.command_center.read",
+    "alerts.create",
     "contacts.read",
   ],
+};
+
+const EMPTY_COMMAND_CENTER = {
+  incident: null as unknown, // filled in per-test via OPEN_INCIDENT
+  participantsSummary: { total: 0, registeredUsers: 0, contacts: 0 },
+  alertsSummary: {
+    total: 0,
+    draft: 0,
+    ready: 0,
+    dispatching: 0,
+    submitted: 0,
+    partiallySubmitted: 0,
+    submissionFailed: 0,
+    cancelled: 0,
+    delivery: { total: 0, submissionFailed: 0, deliveryPending: 0, delivered: 0, undelivered: 0, bounced: 0, failed: 0 },
+  },
+  recentAlerts: [] as unknown[],
+  recentTimeline: [] as unknown[],
 };
 
 const OPEN_INCIDENT = {
@@ -122,10 +142,10 @@ function mockRoutes(overrides: Record<string, () => unknown> = {}): void {
   );
 }
 
-function renderIncidentsPage(): void {
+function renderIncidentsPage(onNavigateToAlerts?: (request: { alertId?: string; createIncidentId?: string }) => void): void {
   render(
     <AuthProvider>
-      <IncidentsPage />
+      <IncidentsPage onNavigateToAlerts={onNavigateToAlerts} />
     </AuthProvider>,
   );
 }
@@ -237,5 +257,157 @@ describe("IncidentsPage", () => {
     });
     expect(screen.queryByRole("button", { name: "Save details" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Activate" })).not.toBeInTheDocument();
+  });
+
+  describe("Command Center tab", () => {
+    it("shows the aggregate communication summary and recent alerts", async () => {
+      mockRoutes({
+        [`GET /incidents/${OPEN_INCIDENT.id}/command-center`]: () => ({
+          ...EMPTY_COMMAND_CENTER,
+          incident: OPEN_INCIDENT,
+          alertsSummary: {
+            ...EMPTY_COMMAND_CENTER.alertsSummary,
+            total: 2,
+            submitted: 1,
+            draft: 1,
+            delivery: { total: 1, submissionFailed: 0, deliveryPending: 0, delivered: 1, undelivered: 0, bounced: 0, failed: 0 },
+          },
+          recentAlerts: [
+            {
+              id: "dddddddd-4444-4444-4444-444444444444",
+              alertNumber: "ALT-2026-000001",
+              title: "Test Alert",
+              channel: "sms",
+              status: "submitted",
+              createdByDisplayName: "Admin User",
+              createdAt: "2026-01-01T00:00:00.000Z",
+              updatedAt: "2026-01-01T00:00:00.000Z",
+              deliverySummary: {
+                total: 1,
+                submissionFailed: 0,
+                deliveryPending: 0,
+                delivered: 1,
+                undelivered: 0,
+                bounced: 0,
+                failed: 0,
+                overallStatus: "complete",
+                deliveryCompletedAt: "2026-01-01T00:05:00.000Z",
+              },
+            },
+          ],
+        }),
+      });
+      renderIncidentsPage();
+
+      fireEvent.click(await screen.findByText("Potential Cybersecurity Incident"));
+      fireEvent.click(await screen.findByRole("button", { name: "Command Center" }));
+
+      await screen.findByText(/2 alerts/);
+      expect(screen.getByText(/1 draft/)).toBeInTheDocument();
+      expect(screen.getByText(/1 submitted/)).toBeInTheDocument();
+      expect(screen.getByText("ALT-2026-000001")).toBeInTheDocument();
+    });
+
+    it("navigates to the Alerts page when View is clicked on a recent alert", async () => {
+      const navigations: Array<{ alertId?: string; createIncidentId?: string }> = [];
+      mockRoutes({
+        [`GET /incidents/${OPEN_INCIDENT.id}/command-center`]: () => ({
+          ...EMPTY_COMMAND_CENTER,
+          incident: OPEN_INCIDENT,
+          recentAlerts: [
+            {
+              id: "dddddddd-4444-4444-4444-444444444444",
+              alertNumber: "ALT-2026-000001",
+              title: "Test Alert",
+              channel: "sms",
+              status: "submitted",
+              createdByDisplayName: "Admin User",
+              createdAt: "2026-01-01T00:00:00.000Z",
+              updatedAt: "2026-01-01T00:00:00.000Z",
+              deliverySummary: {
+                total: 1,
+                submissionFailed: 0,
+                deliveryPending: 1,
+                delivered: 0,
+                undelivered: 0,
+                bounced: 0,
+                failed: 0,
+                overallStatus: "in_progress",
+                deliveryCompletedAt: null,
+              },
+            },
+          ],
+        }),
+      });
+      renderIncidentsPage((request) => navigations.push(request));
+
+      fireEvent.click(await screen.findByText("Potential Cybersecurity Incident"));
+      fireEvent.click(await screen.findByRole("button", { name: "Command Center" }));
+      fireEvent.click(await screen.findByRole("button", { name: "View" }));
+
+      expect(navigations).toEqual([{ alertId: "dddddddd-4444-4444-4444-444444444444" }]);
+    });
+
+    it("navigates to alert creation, pre-selecting this incident, from the quick-create shortcut", async () => {
+      const navigations: Array<{ alertId?: string; createIncidentId?: string }> = [];
+      mockRoutes({
+        [`GET /incidents/${OPEN_INCIDENT.id}/command-center`]: () => ({ ...EMPTY_COMMAND_CENTER, incident: OPEN_INCIDENT }),
+      });
+      renderIncidentsPage((request) => navigations.push(request));
+
+      fireEvent.click(await screen.findByText("Potential Cybersecurity Incident"));
+      fireEvent.click(await screen.findByRole("button", { name: "Command Center" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Create Alert for this Incident" }));
+
+      expect(navigations).toEqual([{ createIncidentId: OPEN_INCIDENT.id }]);
+    });
+
+    it("hides the quick Create Alert shortcut for a closed incident (the backend would reject it)", async () => {
+      mockRoutes({
+        "GET /incidents": () => ({ items: [CLOSED_INCIDENT], total: 1, page: 1, pageSize: 25 }),
+        [`GET /incidents/${CLOSED_INCIDENT.id}`]: () => ({ incident: CLOSED_INCIDENT }),
+        [`GET /incidents/${CLOSED_INCIDENT.id}/command-center`]: () => ({ ...EMPTY_COMMAND_CENTER, incident: CLOSED_INCIDENT }),
+      });
+      renderIncidentsPage();
+
+      fireEvent.click(await screen.findByText("Potential Cybersecurity Incident"));
+      fireEvent.click(await screen.findByRole("button", { name: "Command Center" }));
+
+      await screen.findByText(/0 alerts/);
+      expect(screen.queryByRole("button", { name: "Create Alert for this Incident" })).not.toBeInTheDocument();
+    });
+
+    it("does not show the Command Center tab for a user without incidents.command_center.read", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: string | URL, init?: RequestInit) => {
+          const path = new URL(String(input)).pathname;
+          const method = (init?.method ?? "GET").toUpperCase();
+          if (path === "/auth/me") {
+            return Promise.resolve({
+              ok: true,
+              json: () =>
+                Promise.resolve({
+                  user: { ...ADMIN_USER, permissions: ["incidents.read", "incidents.timeline.read"] },
+                }),
+            });
+          }
+          if (path === "/incidents" && method === "GET") {
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [OPEN_INCIDENT], total: 1, page: 1, pageSize: 25 }) });
+          }
+          if (path === `/incidents/${OPEN_INCIDENT.id}` && method === "GET") {
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ incident: OPEN_INCIDENT }) });
+          }
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+        }),
+      );
+      renderIncidentsPage();
+
+      fireEvent.click(await screen.findByText("Potential Cybersecurity Incident"));
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Overview" })).toBeInTheDocument();
+      });
+      expect(screen.queryByRole("button", { name: "Command Center" })).not.toBeInTheDocument();
+    });
   });
 });

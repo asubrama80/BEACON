@@ -1,5 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
-import { alertRecipients, notificationDeliveryEvents, type Database, type DbOrTx } from "@beacon/database";
+import { alertRecipients, alerts, notificationDeliveryEvents, type Database, type DbOrTx } from "@beacon/database";
 import type { DeliveryStatus, NormalizedEventStatus } from "./deliveryStatus.js";
 
 export interface RecipientForDelivery {
@@ -130,6 +130,45 @@ export async function getDeliverySummary(db: DbOrTx, alertId: string): Promise<D
     .select({ status: alertRecipients.status, deliveryStatus: alertRecipients.deliveryStatus, count: sql<number>`count(*)::int` })
     .from(alertRecipients)
     .where(eq(alertRecipients.alertId, alertId))
+    .groupBy(alertRecipients.status, alertRecipients.deliveryStatus);
+
+  const counts: DeliverySummaryCounts = {
+    total: 0,
+    submissionFailed: 0,
+    deliveryPending: 0,
+    delivered: 0,
+    undelivered: 0,
+    bounced: 0,
+    failed: 0,
+  };
+  for (const row of rows) {
+    counts.total += row.count;
+    if (row.status === "submission_failed") {
+      counts.submissionFailed += row.count;
+      continue;
+    }
+    if (row.status !== "submitted") continue;
+    if (row.deliveryStatus === "delivered") counts.delivered += row.count;
+    else if (row.deliveryStatus === "undelivered") counts.undelivered += row.count;
+    else if (row.deliveryStatus === "bounced") counts.bounced += row.count;
+    else if (row.deliveryStatus === "failed") counts.failed += row.count;
+    else counts.deliveryPending += row.count;
+  }
+  return counts;
+}
+
+/**
+ * Same aggregate shape as `getDeliverySummary`, but rolled up across every recipient of every
+ * Alert belonging to one Incident — used by Module 12's Command Center. Joins to `alerts` only to
+ * scope by `incident_id`; never touches Contact/Group data or destination PII. See
+ * claude/prompts/12-incident-command-center.md, "Alert communication summary".
+ */
+export async function getIncidentDeliverySummary(db: DbOrTx, incidentId: string): Promise<DeliverySummaryCounts> {
+  const rows = await db
+    .select({ status: alertRecipients.status, deliveryStatus: alertRecipients.deliveryStatus, count: sql<number>`count(*)::int` })
+    .from(alertRecipients)
+    .innerJoin(alerts, eq(alerts.id, alertRecipients.alertId))
+    .where(eq(alerts.incidentId, incidentId))
     .groupBy(alertRecipients.status, alertRecipients.deliveryStatus);
 
   const counts: DeliverySummaryCounts = {

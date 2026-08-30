@@ -20,7 +20,12 @@ const SEVERITY_BADGE: Record<string, string> = {
   critical: "badge-critical",
 };
 
-export default function IncidentsPage(): JSX.Element {
+interface IncidentsPageProps {
+  /** Optional cross-page navigation hook — lets Command Center deep-link into the Alerts page. */
+  onNavigateToAlerts?: (request: { alertId?: string; createIncidentId?: string }) => void;
+}
+
+export default function IncidentsPage({ onNavigateToAlerts }: IncidentsPageProps = {}): JSX.Element {
   const { user } = useAuth();
   const [items, setItems] = useState<Incident[]>([]);
   const [total, setTotal] = useState(0);
@@ -164,6 +169,7 @@ export default function IncidentsPage(): JSX.Element {
             void refresh();
           }}
           onChanged={() => void refresh()}
+          onNavigateToAlerts={onNavigateToAlerts}
         />
       )}
     </div>

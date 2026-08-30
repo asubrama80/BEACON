@@ -186,3 +186,19 @@ export const MODULE_11_PERMISSIONS = [
 ] as const;
 
 export type Module11PermissionCode = (typeof MODULE_11_PERMISSIONS)[number]["code"];
+
+/**
+ * Module 12's Incident Command Center permission code. Gates a single new read-only aggregate
+ * endpoint (`GET /incidents/:id/command-center`) that projects existing Module 08-11 data — it
+ * grants no new write capability and creates no parallel authorization model. See
+ * claude/prompts/12-incident-command-center.md, "Permissions".
+ */
+export const MODULE_12_PERMISSIONS = [
+  {
+    code: "incidents.command_center.read",
+    name: "View incident command center",
+    description: "View the aggregated operational Command Center projection for an Incident.",
+  },
+] as const;
+
+export type Module12PermissionCode = (typeof MODULE_12_PERMISSIONS)[number]["code"];

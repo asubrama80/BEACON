@@ -6,6 +6,7 @@ import {
   addUserParticipant,
   assignCommander,
   closeIncident,
+  getCommandCenter,
   getIncident,
   listParticipants,
   listTimeline,
@@ -14,20 +15,27 @@ import {
   resolveIncident,
   updateIncident,
 } from "./api";
-import type { Incident, IncidentSeverity, Participant, TimelineEvent } from "./types";
+import type { CommandCenter, Incident, IncidentSeverity, Participant, TimelineEvent } from "./types";
 import { listUsers } from "../users/api";
 import type { UserSummary } from "../users/types";
 import { listContacts } from "../contacts/api";
 import type { Contact } from "../contacts/types";
 import { useAuth } from "../auth/useAuth";
 
+interface NavigateToAlertsRequest {
+  alertId?: string;
+  createIncidentId?: string;
+}
+
 interface IncidentDetailModalProps {
   incidentId: string;
   onClose: () => void;
   onChanged: () => void;
+  /** Optional cross-page navigation hook — lets Command Center deep-link into the Alerts page. */
+  onNavigateToAlerts?: (request: NavigateToAlertsRequest) => void;
 }
 
-type Tab = "overview" | "participants" | "timeline";
+type Tab = "overview" | "commandCenter" | "participants" | "timeline";
 
 const STATUS_BADGE: Record<string, string> = {
   open: "badge-neutral",
@@ -36,7 +44,12 @@ const STATUS_BADGE: Record<string, string> = {
   closed: "badge-success",
 };
 
-export default function IncidentDetailModal({ incidentId, onClose, onChanged }: IncidentDetailModalProps): JSX.Element {
+export default function IncidentDetailModal({
+  incidentId,
+  onClose,
+  onChanged,
+  onNavigateToAlerts,
+}: IncidentDetailModalProps): JSX.Element {
   const { user } = useAuth();
   const canUpdate = user?.permissions.includes("incidents.update") ?? false;
   const canManageLifecycle = user?.permissions.includes("incidents.lifecycle.manage") ?? false;
@@ -45,6 +58,8 @@ export default function IncidentDetailModal({ incidentId, onClose, onChanged }: 
   const canReadParticipants =
     (user?.permissions.includes("incidents.read") ?? false) && (user?.permissions.includes("contacts.read") ?? false);
   const canReadTimeline = user?.permissions.includes("incidents.timeline.read") ?? false;
+  const canReadCommandCenter = user?.permissions.includes("incidents.command_center.read") ?? false;
+  const canCreateAlert = user?.permissions.includes("alerts.create") ?? false;
 
   const [tab, setTab] = useState<Tab>("overview");
   const [incident, setIncident] = useState<Incident | null>(null);
@@ -142,6 +157,15 @@ export default function IncidentDetailModal({ incidentId, onClose, onChanged }: 
         >
           Overview
         </button>
+        {canReadCommandCenter && (
+          <button
+            type="button"
+            className={`btn btn-sm ${tab === "commandCenter" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setTab("commandCenter")}
+          >
+            Command Center
+          </button>
+        )}
         <button
           type="button"
           className={`btn btn-sm ${tab === "participants" ? "btn-primary" : "btn-secondary"}`}
@@ -190,6 +214,14 @@ export default function IncidentDetailModal({ incidentId, onClose, onChanged }: 
               }
             })()
           }
+        />
+      )}
+
+      {tab === "commandCenter" && (
+        <CommandCenterTab
+          incidentId={incidentId}
+          canCreateAlert={canCreateAlert && !isClosed}
+          onNavigateToAlerts={onNavigateToAlerts}
         />
       )}
 
@@ -725,5 +757,162 @@ function TimelineTab({ incidentId, canRead }: TimelineTabProps): JSX.Element {
         )}
       </div>
     </div>
+  );
+}
+
+const ALERT_STATUS_BADGE: Record<string, string> = {
+  draft: "badge-neutral",
+  ready: "badge-success",
+  cancelled: "badge-warning",
+  dispatching: "badge-neutral",
+  submitted: "badge-success",
+  partially_submitted: "badge-warning",
+  submission_failed: "badge-critical",
+};
+
+interface CommandCenterTabProps {
+  incidentId: string;
+  canCreateAlert: boolean;
+  onNavigateToAlerts?: (request: NavigateToAlertsRequest) => void;
+}
+
+/**
+ * Read-only aggregation over existing Module 08-11 data — this tab never introduces a parallel
+ * incident/alert/delivery status model of its own. See
+ * claude/prompts/12-incident-command-center.md, "Command Center architecture".
+ */
+function CommandCenterTab({ incidentId, canCreateAlert, onNavigateToAlerts }: CommandCenterTabProps): JSX.Element {
+  const [data, setData] = useState<CommandCenter | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setError(null);
+    try {
+      setData(await getCommandCenter(incidentId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load the command center.");
+    }
+  }, [incidentId]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  if (error) {
+    return (
+      <p className="error-banner" role="alert">
+        {error}
+      </p>
+    );
+  }
+  if (!data) {
+    return <p>Loading…</p>;
+  }
+
+  const { alertsSummary, recentAlerts, recentTimeline } = data;
+
+  return (
+    <>
+      <div className="detail-section">
+        <div className="detail-section-title">Communication status</div>
+        <p className="cell-primary">
+          {alertsSummary.total} alert{alertsSummary.total === 1 ? "" : "s"} — {alertsSummary.draft} draft,{" "}
+          {alertsSummary.ready} ready, {alertsSummary.submitted} submitted
+          {alertsSummary.partiallySubmitted > 0 && `, ${alertsSummary.partiallySubmitted} partially submitted`}
+          {alertsSummary.submissionFailed > 0 && `, ${alertsSummary.submissionFailed} submission failed`}
+        </p>
+        <p className="cell-muted">
+          Delivery: {alertsSummary.delivery.delivered} delivered, {alertsSummary.delivery.deliveryPending} pending
+          {alertsSummary.delivery.undelivered > 0 && `, ${alertsSummary.delivery.undelivered} undelivered`}
+          {alertsSummary.delivery.bounced > 0 && `, ${alertsSummary.delivery.bounced} bounced`}
+          {alertsSummary.delivery.failed > 0 && `, ${alertsSummary.delivery.failed} failed`}
+        </p>
+        {canCreateAlert && onNavigateToAlerts && (
+          <div className="detail-actions" style={{ marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => onNavigateToAlerts({ createIncidentId: incidentId })}
+            >
+              Create Alert for this Incident
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="detail-section">
+        <div className="detail-section-title">Recent Alerts</div>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Number</th>
+                <th>Channel</th>
+                <th>Status</th>
+                <th>Delivery</th>
+                <th>Created</th>
+                {onNavigateToAlerts && <th></th>}
+              </tr>
+            </thead>
+            <tbody>
+              {recentAlerts.map((a) => (
+                <tr key={a.id}>
+                  <td className="cell-muted">{a.alertNumber}</td>
+                  <td className="cell-muted">{a.channel.toUpperCase()}</td>
+                  <td>
+                    <span className={`badge ${ALERT_STATUS_BADGE[a.status] ?? "badge-neutral"}`}>{a.status}</span>
+                  </td>
+                  <td className="cell-muted">
+                    {a.deliverySummary.delivered} delivered, {a.deliverySummary.deliveryPending} pending
+                  </td>
+                  <td className="cell-muted">
+                    {new Date(a.createdAt).toLocaleString()}
+                    {a.createdByDisplayName ? ` · ${a.createdByDisplayName}` : ""}
+                  </td>
+                  {onNavigateToAlerts && (
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => onNavigateToAlerts({ alertId: a.id })}
+                      >
+                        View
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {recentAlerts.length === 0 && (
+            <div className="empty-state">
+              <p>No alerts yet for this incident.</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="detail-section">
+        <div className="detail-section-title">Recent Timeline</div>
+        <div className="table-wrap">
+          <table className="data-table">
+            <tbody>
+              {recentTimeline.map((event) => (
+                <tr key={event.id}>
+                  <td className="cell-muted">{new Date(event.occurredAt).toLocaleString()}</td>
+                  <td className="cell-primary">{event.eventType.replaceAll("_", " ")}</td>
+                  <td className="cell-muted">{event.actorDisplayName ?? "System"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {recentTimeline.length === 0 && (
+            <div className="empty-state">
+              <p>No timeline events yet.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   );
 }

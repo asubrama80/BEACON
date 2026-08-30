@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Modal from "../components/Modal";
 import { createAlert } from "./api";
 import type { AlertDetail } from "./types";
-import { listIncidents } from "../incidents/api";
+import { getIncident, listIncidents } from "../incidents/api";
 import type { Incident } from "../incidents/types";
 import { listTemplates } from "../templates/api";
 import type { Template } from "../templates/types";
@@ -10,9 +10,11 @@ import type { Template } from "../templates/types";
 interface CreateAlertModalProps {
   onClose: () => void;
   onCreated: (alert: AlertDetail) => void;
+  /** Pre-selects this Incident — used by the Command Center's "Create Alert" shortcut. */
+  initialIncidentId?: string;
 }
 
-export default function CreateAlertModal({ onClose, onCreated }: CreateAlertModalProps): JSX.Element {
+export default function CreateAlertModal({ onClose, onCreated, initialIncidentId }: CreateAlertModalProps): JSX.Element {
   const [title, setTitle] = useState("");
   const [channel, setChannel] = useState<"sms" | "email">("sms");
   const [contentSource, setContentSource] = useState<"template" | "adhoc">("adhoc");
@@ -29,6 +31,13 @@ export default function CreateAlertModal({ onClose, onCreated }: CreateAlertModa
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!initialIncidentId) return;
+    getIncident(initialIncidentId)
+      .then((found) => setIncident(found))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Unable to load the selected incident."));
+  }, [initialIncidentId]);
 
   async function searchIncidents(): Promise<void> {
     if (!incidentSearch.trim()) {

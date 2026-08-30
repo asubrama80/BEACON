@@ -68,6 +68,66 @@ export interface TimelineListResponse {
   pageSize: number;
 }
 
+export interface ParticipantsSummary {
+  total: number;
+  registeredUsers: number;
+  contacts: number;
+}
+
+export interface DeliverySummaryCounts {
+  total: number;
+  submissionFailed: number;
+  deliveryPending: number;
+  delivered: number;
+  undelivered: number;
+  bounced: number;
+  failed: number;
+}
+
+/** `submissionFailed` here counts Alerts whose own status is submission_failed — distinct from
+ * `delivery.submissionFailed`, which counts individual recipients whose submission failed. */
+export interface AlertsSummary {
+  total: number;
+  draft: number;
+  ready: number;
+  dispatching: number;
+  submitted: number;
+  partiallySubmitted: number;
+  submissionFailed: number;
+  cancelled: number;
+  delivery: DeliverySummaryCounts;
+}
+
+export interface RecentAlert {
+  id: string;
+  alertNumber: string;
+  title: string;
+  channel: "sms" | "email";
+  status: string;
+  createdByDisplayName: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deliverySummary: {
+    total: number;
+    submissionFailed: number;
+    deliveryPending: number;
+    delivered: number;
+    undelivered: number;
+    bounced: number;
+    failed: number;
+    overallStatus: "pending" | "in_progress" | "complete" | "partial_failure" | "failed";
+    deliveryCompletedAt: string | null;
+  };
+}
+
+export interface CommandCenter {
+  incident: Incident;
+  participantsSummary: ParticipantsSummary;
+  alertsSummary: AlertsSummary;
+  recentAlerts: RecentAlert[];
+  recentTimeline: TimelineEvent[];
+}
+
 export interface ApiErrorBody {
   error?: string;
   message?: string;

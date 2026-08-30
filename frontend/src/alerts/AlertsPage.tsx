@@ -21,7 +21,14 @@ const STATUS_LABEL: Record<string, string> = {
   submission_failed: "submission failed",
 };
 
-export default function AlertsPage(): JSX.Element {
+interface AlertsPageProps {
+  /** One-shot deep-link request — e.g. from the Incident Command Center's "View"/"Create Alert"
+   * shortcuts. Consumed on mount/change, then reported back via `onDeepLinkHandled`. */
+  deepLink?: { alertId?: string; createIncidentId?: string } | null;
+  onDeepLinkHandled?: () => void;
+}
+
+export default function AlertsPage({ deepLink, onDeepLinkHandled }: AlertsPageProps = {}): JSX.Element {
   const { user } = useAuth();
   const [items, setItems] = useState<AlertSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -31,9 +38,21 @@ export default function AlertsPage(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [createForIncidentId, setCreateForIncidentId] = useState<string | undefined>(undefined);
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
 
   const canCreate = user?.permissions.includes("alerts.create") ?? false;
+
+  useEffect(() => {
+    if (!deepLink) return;
+    if (deepLink.alertId) setSelectedAlertId(deepLink.alertId);
+    if (deepLink.createIncidentId) {
+      setCreateForIncidentId(deepLink.createIncidentId);
+      setShowCreate(true);
+    }
+    onDeepLinkHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLink]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -153,9 +172,14 @@ export default function AlertsPage(): JSX.Element {
 
       {showCreate && (
         <CreateAlertModal
-          onClose={() => setShowCreate(false)}
+          initialIncidentId={createForIncidentId}
+          onClose={() => {
+            setShowCreate(false);
+            setCreateForIncidentId(undefined);
+          }}
           onCreated={(alert) => {
             setShowCreate(false);
+            setCreateForIncidentId(undefined);
             void refresh();
             setSelectedAlertId(alert.id);
           }}

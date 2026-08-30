@@ -15,6 +15,7 @@ import {
   MODULE_09_PERMISSIONS,
   MODULE_10_PERMISSIONS,
   MODULE_11_PERMISSIONS,
+  MODULE_12_PERMISSIONS,
   type Module03PermissionCode,
   type Module04PermissionCode,
   type Module05PermissionCode,
@@ -24,6 +25,7 @@ import {
   type Module09PermissionCode,
   type Module10PermissionCode,
   type Module11PermissionCode,
+  type Module12PermissionCode,
 } from "./permissionCodes.js";
 
 const ROLE_NAMES: Record<SystemRoleCode, string> = {
@@ -62,6 +64,7 @@ const ALL_PERMISSIONS = [
   ...MODULE_09_PERMISSIONS,
   ...MODULE_10_PERMISSIONS,
   ...MODULE_11_PERMISSIONS,
+  ...MODULE_12_PERMISSIONS,
 ];
 type AnyPermissionCode =
   | Module03PermissionCode
@@ -72,7 +75,8 @@ type AnyPermissionCode =
   | Module08PermissionCode
   | Module09PermissionCode
   | Module10PermissionCode
-  | Module11PermissionCode;
+  | Module11PermissionCode
+  | Module12PermissionCode;
 
 /**
  * ADMIN gets full administrative control of every seeded permission. Other roles are granted
@@ -97,6 +101,7 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     // claude/prompts/09-alert-engine.md, "Permission mapping".
     "alerts.recipients.read",
     "alerts.delivery.read",
+    "incidents.command_center.read",
   ],
   INCIDENT_COMMANDER: [
     // users.read is newly justified by Module 08: assigning/changing an Incident's commander
@@ -124,6 +129,7 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "alerts.recipients.read",
     "alerts.dispatch",
     "alerts.delivery.read",
+    "incidents.command_center.read",
   ],
   COMMUNICATION_MANAGER: [
     "contacts.read",
@@ -150,6 +156,7 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "alerts.recipients.read",
     "alerts.dispatch",
     "alerts.delivery.read",
+    "incidents.command_center.read",
   ],
   RESPONDER: [
     "incidents.read",
@@ -157,6 +164,11 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "alerts.read",
     // Deliberately withheld: recipient rows carry destination phone/email PII, and nothing in
     // this role's job requires seeing it. See claude/prompts/09-alert-engine.md.
+    // Command Center authorization is currently global (matches incidents.read's existing
+    // global model — no row-level "assigned incident" concept exists yet); granted here per
+    // the module spec's explicit fallback: "If row-level security is ambiguous, retain current
+    // global permission model." See claude/prompts/12-incident-command-center.md, "Permissions".
+    "incidents.command_center.read",
   ],
 };
 

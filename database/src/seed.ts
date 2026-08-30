@@ -12,12 +12,14 @@ import {
   MODULE_06_PERMISSIONS,
   MODULE_07_PERMISSIONS,
   MODULE_08_PERMISSIONS,
+  MODULE_09_PERMISSIONS,
   type Module03PermissionCode,
   type Module04PermissionCode,
   type Module05PermissionCode,
   type Module06PermissionCode,
   type Module07PermissionCode,
   type Module08PermissionCode,
+  type Module09PermissionCode,
 } from "./permissionCodes.js";
 
 const ROLE_NAMES: Record<SystemRoleCode, string> = {
@@ -53,6 +55,7 @@ const ALL_PERMISSIONS = [
   ...MODULE_06_PERMISSIONS,
   ...MODULE_07_PERMISSIONS,
   ...MODULE_08_PERMISSIONS,
+  ...MODULE_09_PERMISSIONS,
 ];
 type AnyPermissionCode =
   | Module03PermissionCode
@@ -60,7 +63,8 @@ type AnyPermissionCode =
   | Module05PermissionCode
   | Module06PermissionCode
   | Module07PermissionCode
-  | Module08PermissionCode;
+  | Module08PermissionCode
+  | Module09PermissionCode;
 
 /**
  * ADMIN gets full administrative control of every seeded permission. Other roles are granted
@@ -79,6 +83,11 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "templates.read",
     "incidents.read",
     "incidents.timeline.read",
+    "alerts.read",
+    // Auditor's job is compliance/audit review of BEACON's own communications (see README's
+    // "who did what and when" framing) — granted deliberately, not by default; see
+    // claude/prompts/09-alert-engine.md, "Permission mapping".
+    "alerts.recipients.read",
   ],
   INCIDENT_COMMANDER: [
     // users.read is newly justified by Module 08: assigning/changing an Incident's commander
@@ -98,6 +107,12 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "incidents.commander.assign",
     "incidents.participants.manage",
     "incidents.timeline.read",
+    "alerts.read",
+    "alerts.create",
+    "alerts.update",
+    "alerts.ready",
+    "alerts.cancel",
+    "alerts.recipients.read",
   ],
   COMMUNICATION_MANAGER: [
     "contacts.read",
@@ -116,8 +131,20 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "incidents.read",
     "incidents.create",
     "incidents.timeline.read",
+    "alerts.read",
+    "alerts.create",
+    "alerts.update",
+    "alerts.ready",
+    "alerts.cancel",
+    "alerts.recipients.read",
   ],
-  RESPONDER: ["incidents.read", "incidents.timeline.read"],
+  RESPONDER: [
+    "incidents.read",
+    "incidents.timeline.read",
+    "alerts.read",
+    // Deliberately withheld: recipient rows carry destination phone/email PII, and nothing in
+    // this role's job requires seeing it. See claude/prompts/09-alert-engine.md.
+  ],
 };
 
 export async function seedPermissions(db: ReturnType<typeof drizzle>): Promise<void> {

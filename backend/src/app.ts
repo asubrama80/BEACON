@@ -17,12 +17,15 @@ import { contactImportRoutes } from "./modules/contactImport/routes.js";
 import { groupsRoutes } from "./modules/groups/routes.js";
 import { templatesRoutes } from "./modules/templates/routes.js";
 import { incidentsRoutes } from "./modules/incidents/routes.js";
+import { alertsRoutes } from "./modules/alerts/routes.js";
+import { loadAlertConfig, type AlertConfig } from "./modules/alerts/config.js";
 
 export interface BuildAppOptions {
   env?: AppEnv;
   authConfig?: AuthConfig;
   mfaEncryptionKey?: Buffer;
   contactImportConfig?: ContactImportConfig;
+  alertConfig?: AlertConfig;
 }
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
@@ -30,6 +33,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const authConfig = options.authConfig ?? loadAuthConfig();
   const mfaEncryptionKey = options.mfaEncryptionKey ?? loadMfaEncryptionKey();
   const contactImportConfig = options.contactImportConfig ?? loadContactImportConfig();
+  const alertConfig = options.alertConfig ?? loadAlertConfig();
 
   const app = Fastify({ logger: env.nodeEnv !== "test" });
 
@@ -59,6 +63,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.register((instance) => groupsRoutes(instance, { config: authConfig }));
   app.register((instance) => templatesRoutes(instance, { config: authConfig }));
   app.register((instance) => incidentsRoutes(instance, { config: authConfig }));
+  app.register((instance) => alertsRoutes(instance, { config: authConfig, alertConfig }));
 
   app.setErrorHandler((error: FastifyError | AuthError, request, reply) => {
     if (error instanceof AuthError) {

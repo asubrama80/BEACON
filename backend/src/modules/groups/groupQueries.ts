@@ -1,5 +1,5 @@
 import { and, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
-import { groups, groupMembers, contacts, type Database } from "@beacon/database";
+import { groups, groupMembers, contacts, type Database, type DbOrTx } from "@beacon/database";
 import type { GroupMemberRow, GroupRow } from "./dto.js";
 
 const MEMBER_COUNT = sql<number>`count(${groupMembers.id})::int`;
@@ -60,7 +60,7 @@ export async function listGroups(db: Database, filter: ListGroupsFilter): Promis
   return { items, total };
 }
 
-export async function findGroupById(db: Database, id: string): Promise<GroupRow | undefined> {
+export async function findGroupById(db: DbOrTx, id: string): Promise<GroupRow | undefined> {
   const [row] = await db
     .select({
       id: groups.id,
@@ -157,7 +157,7 @@ export async function listMembers(
 }
 
 /** Reusable membership boundary for a future Module 09 — raw member Contact ids, no filtering. */
-export async function getGroupMemberContactIds(db: Database, groupId: string): Promise<string[]> {
+export async function getGroupMemberContactIds(db: DbOrTx, groupId: string): Promise<string[]> {
   const rows = await db
     .select({ contactId: groupMembers.contactId })
     .from(groupMembers)

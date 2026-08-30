@@ -1,5 +1,5 @@
 import { and, eq, ilike, isNull, ne, sql } from "drizzle-orm";
-import { templates, type Database } from "@beacon/database";
+import { templates, type Database, type DbOrTx } from "@beacon/database";
 import type { TemplateRow } from "./dto.js";
 
 const SAFE_TEMPLATE_COLUMNS = {
@@ -57,7 +57,7 @@ export async function listTemplates(db: Database, filter: ListTemplatesFilter): 
   return { items, total };
 }
 
-export async function findTemplateById(db: Database, id: string): Promise<TemplateRow | undefined> {
+export async function findTemplateById(db: DbOrTx, id: string): Promise<TemplateRow | undefined> {
   const [row] = await db
     .select(SAFE_TEMPLATE_COLUMNS)
     .from(templates)

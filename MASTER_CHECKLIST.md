@@ -13,7 +13,7 @@ Work proceeds one module at a time, in order, unless the user directs otherwise.
 - [x] 06 Groups
 - [x] 07 Templates
 - [x] 08 Incident Management
-- [ ] 09 Alert Engine
+- [x] 09 Alert Engine
 - [ ] 10 Notification Providers
 - [ ] 11 Delivery Tracking
 - [ ] 12 Incident Command Center

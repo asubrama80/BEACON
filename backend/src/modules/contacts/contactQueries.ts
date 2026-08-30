@@ -1,5 +1,5 @@
-import { and, eq, ilike, ne, or, sql } from "drizzle-orm";
-import { contacts, type Database } from "@beacon/database";
+import { and, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
+import { contacts, type Database, type DbOrTx } from "@beacon/database";
 import type { ContactRow } from "./dto.js";
 
 const SAFE_CONTACT_COLUMNS = {
@@ -18,6 +18,12 @@ const SAFE_CONTACT_COLUMNS = {
 export async function findContactById(db: Database, id: string): Promise<ContactRow | undefined> {
   const [row] = await db.select(SAFE_CONTACT_COLUMNS).from(contacts).where(eq(contacts.id, id)).limit(1);
   return row;
+}
+
+/** Batch lookup — reusable by a future Alert module's recipient resolution (Module 09). */
+export async function findContactsByIds(db: DbOrTx, ids: string[]): Promise<ContactRow[]> {
+  if (ids.length === 0) return [];
+  return db.select(SAFE_CONTACT_COLUMNS).from(contacts).where(inArray(contacts.id, ids));
 }
 
 export interface ListContactsFilter {

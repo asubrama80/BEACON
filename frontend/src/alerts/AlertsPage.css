@@ -1,0 +1,13 @@
+@import "../components/adminUi.css";
+
+.alerts-page {
+  padding: 28px;
+  max-width: 1180px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.alert-number {
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}

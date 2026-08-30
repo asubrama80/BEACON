@@ -9,6 +9,8 @@ export * from "./incidentParticipants.js";
 export * from "./incidentTimelineEvents.js";
 export * from "./alerts.js";
 export * from "./alertRecipients.js";
+export * from "./alertContactSelections.js";
+export * from "./alertGroupSelections.js";
 export * from "./chatMessages.js";
 export * from "./auditLogs.js";
 export * from "./sessions.js";

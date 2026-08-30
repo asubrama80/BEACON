@@ -333,4 +333,73 @@ describe("App", () => {
     });
     expect(screen.queryByRole("button", { name: "Incidents" })).not.toBeInTheDocument();
   });
+
+  it("shows Alerts navigation for a user with alerts.read and can reach the page", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL) => {
+        const path = new URL(String(input)).pathname;
+        if (path === "/auth/me") {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                user: {
+                  id: "99999999-1111-1111-1111-111111111111",
+                  email: "commsmgr@example.invalid",
+                  displayName: "Comms Manager",
+                  status: "active",
+                  isBreakGlass: false,
+                  mfaEnabled: false,
+                  roles: ["COMMUNICATION_MANAGER"],
+                  permissions: ["alerts.read", "alerts.create"],
+                },
+              }),
+          });
+        }
+        if (path === "/alerts") {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ items: [], total: 0, page: 1, pageSize: 25 }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }),
+    );
+
+    render(<App />);
+
+    const alertsNavButton = await screen.findByRole("button", { name: "Alerts" });
+    alertsNavButton.click();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2, name: "Alerts" })).toBeInTheDocument();
+    });
+  });
+
+  it("does not show Alerts navigation for a user without alerts.read", async () => {
+    mockAuthMe({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          user: {
+            id: "99999999-2222-2222-2222-222222222222",
+            email: "noaccess2@example.invalid",
+            displayName: "No Access User Two",
+            status: "active",
+            isBreakGlass: false,
+            mfaEnabled: false,
+            roles: [],
+            permissions: [],
+          },
+        }),
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Signed in")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: "Alerts" })).not.toBeInTheDocument();
+  });
 });

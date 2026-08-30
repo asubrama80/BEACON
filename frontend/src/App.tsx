@@ -8,6 +8,7 @@ import ContactsPage from "./contacts/ContactsPage";
 import GroupsPage from "./groups/GroupsPage";
 import TemplatesPage from "./templates/TemplatesPage";
 import IncidentsPage from "./incidents/IncidentsPage";
+import AlertsPage from "./alerts/AlertsPage";
 
 export default function App(): JSX.Element {
   return (
@@ -17,7 +18,7 @@ export default function App(): JSX.Element {
   );
 }
 
-type View = "dashboard" | "users" | "contacts" | "groups" | "templates" | "incidents";
+type View = "dashboard" | "users" | "contacts" | "groups" | "templates" | "incidents" | "alerts";
 
 function AppShell(): JSX.Element {
   const { user, loading, logout } = useAuth();
@@ -40,6 +41,7 @@ function AppShell(): JSX.Element {
   const canViewGroups = user.permissions.includes("groups.read");
   const canViewTemplates = user.permissions.includes("templates.read");
   const canViewIncidents = user.permissions.includes("incidents.read");
+  const canViewAlerts = user.permissions.includes("alerts.read");
 
   return (
     <div className="app-shell">
@@ -65,7 +67,7 @@ function AppShell(): JSX.Element {
           <p className="app-shell-subtitle">Emergency Communication Platform</p>
         </div>
 
-        {(canViewUsers || canViewContacts || canViewGroups || canViewTemplates || canViewIncidents) && (
+        {(canViewUsers || canViewContacts || canViewGroups || canViewTemplates || canViewIncidents || canViewAlerts) && (
           <nav className="app-shell-nav">
             <button
               type="button"
@@ -81,6 +83,15 @@ function AppShell(): JSX.Element {
                 onClick={() => setView("incidents")}
               >
                 Incidents
+              </button>
+            )}
+            {canViewAlerts && (
+              <button
+                type="button"
+                className={`app-shell-nav-link ${view === "alerts" ? "is-active" : ""}`}
+                onClick={() => setView("alerts")}
+              >
+                Alerts
               </button>
             )}
             {canViewContacts && (
@@ -135,6 +146,8 @@ function AppShell(): JSX.Element {
           <UsersPage />
         ) : view === "incidents" && canViewIncidents ? (
           <IncidentsPage />
+        ) : view === "alerts" && canViewAlerts ? (
+          <AlertsPage />
         ) : view === "contacts" && canViewContacts ? (
           <ContactsPage />
         ) : view === "groups" && canViewGroups ? (

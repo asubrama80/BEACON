@@ -1,0 +1,171 @@
+export type AlertChannel = "sms" | "email";
+export type AlertStatus = "draft" | "ready" | "cancelled";
+export type AlertContentSource = "template" | "adhoc";
+
+export interface IncidentSummaryRef {
+  id: string;
+  incidentNumber: string;
+  title: string;
+  status: string;
+}
+
+export interface TemplateSummaryRef {
+  id: string;
+  name: string;
+  status: string;
+}
+
+/** List-view shape — never includes recipient PII (see module doc, "Recipient PII permission"). */
+export interface AlertSummaryDto {
+  id: string;
+  alertNumber: string;
+  title: string;
+  incident: IncidentSummaryRef | null;
+  channel: AlertChannel;
+  status: AlertStatus;
+  contentSource: AlertContentSource;
+  eligibleRecipientCount: number | null;
+  excludedCount: number | null;
+  createdByDisplayName: string | null;
+  createdAt: string;
+  updatedAt: string;
+  readyAt: string | null;
+  cancelledAt: string | null;
+}
+
+export interface SourceContactRef {
+  id: string;
+  displayName: string;
+}
+
+export interface SourceGroupRef {
+  id: string;
+  name: string;
+}
+
+export interface AlertDetailDto extends AlertSummaryDto {
+  template: TemplateSummaryRef | null;
+  templateNameSnapshot: string | null;
+  /** DRAFT-editable ad-hoc content, or the frozen source snapshot once READY. Never per-recipient. */
+  subject: string | null;
+  body: string | null;
+  exclusionSummary: Record<string, number> | null;
+  sourceContactCount: number;
+  sourceGroupCount: number;
+  /**
+   * DRAFT-time source selections, by name — never phone/email. Distinct from the resolved
+   * recipient snapshot (`GET /alerts/:id/recipients`, gated on `alerts.recipients.read`), which
+   * carries destination PII. See module doc, "Recipient PII permission".
+   */
+  sourceContacts: SourceContactRef[];
+  sourceGroups: SourceGroupRef[];
+}
+
+export interface AlertRow {
+  id: string;
+  alertNumber: string;
+  title: string;
+  incidentId: string | null;
+  incidentNumber: string | null;
+  incidentTitle: string | null;
+  incidentStatus: string | null;
+  templateId: string | null;
+  templateName: string | null;
+  templateStatus: string | null;
+  templateNameSnapshot: string | null;
+  channel: string;
+  status: string;
+  contentSource: string;
+  subject: string | null;
+  body: string | null;
+  eligibleRecipientCount: number | null;
+  excludedCount: number | null;
+  exclusionSummary: unknown;
+  createdByDisplayName: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  readyAt: Date | null;
+  cancelledAt: Date | null;
+  sourceContactCount: number;
+  sourceGroupCount: number;
+}
+
+export function toAlertSummaryDto(row: AlertRow): AlertSummaryDto {
+  return {
+    id: row.id,
+    alertNumber: row.alertNumber,
+    title: row.title,
+    incident:
+      row.incidentId && row.incidentNumber
+        ? { id: row.incidentId, incidentNumber: row.incidentNumber, title: row.incidentTitle ?? "", status: row.incidentStatus ?? "" }
+        : null,
+    channel: row.channel as AlertChannel,
+    status: row.status as AlertStatus,
+    contentSource: row.contentSource as AlertContentSource,
+    eligibleRecipientCount: row.eligibleRecipientCount,
+    excludedCount: row.excludedCount,
+    createdByDisplayName: row.createdByDisplayName,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    readyAt: row.readyAt ? row.readyAt.toISOString() : null,
+    cancelledAt: row.cancelledAt ? row.cancelledAt.toISOString() : null,
+  };
+}
+
+export function toAlertDetailDto(
+  row: AlertRow,
+  sourceContacts: SourceContactRef[] = [],
+  sourceGroups: SourceGroupRef[] = [],
+): AlertDetailDto {
+  return {
+    ...toAlertSummaryDto(row),
+    template: row.templateId && row.templateName ? { id: row.templateId, name: row.templateName, status: row.templateStatus ?? "" } : null,
+    templateNameSnapshot: row.templateNameSnapshot,
+    subject: row.subject,
+    body: row.body,
+    exclusionSummary: (row.exclusionSummary as Record<string, number> | null) ?? null,
+    sourceContactCount: row.sourceContactCount,
+    sourceGroupCount: row.sourceGroupCount,
+    sourceContacts,
+    sourceGroups,
+  };
+}
+
+/** Only ever returned from a `alerts.recipients.read`-gated endpoint — carries destination PII. */
+export interface AlertRecipientDto {
+  id: string;
+  contactId: string | null;
+  displayName: string | null;
+  destination: string | null;
+  channel: AlertChannel;
+  renderedSubject: string | null;
+  renderedBody: string | null;
+  status: string;
+  createdAt: string;
+}
+
+export interface AlertRecipientRow {
+  id: string;
+  contactId: string | null;
+  recipientName: string | null;
+  recipientAddress: string | null;
+  channel: string;
+  renderedSubject: string | null;
+  renderedBody: string | null;
+  status: string;
+  createdAt: Date;
+}
+
+export function toAlertRecipientDto(row: AlertRecipientRow): AlertRecipientDto {
+  return {
+    id: row.id,
+    contactId: row.contactId,
+    displayName: row.recipientName,
+    destination: row.recipientAddress,
+    channel: row.channel as AlertChannel,
+    renderedSubject: row.renderedSubject,
+    renderedBody: row.renderedBody,
+    status: row.status,
+    createdAt: row.createdAt.toISOString(),
+  };
+}

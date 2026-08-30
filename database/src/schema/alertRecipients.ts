@@ -1,12 +1,15 @@
-import { pgTable, uuid, varchar, text, timestamp, index, check } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, timestamp, index, uniqueIndex, check } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { alerts } from "./alerts.js";
 import { contacts } from "./contacts.js";
 
 /**
- * Per-recipient delivery record. `contact_id` is optional so an alert can also target an
- * external/manual recipient captured only as a name/address snapshot — delivery never
- * requires a BEACON user account.
+ * Per-recipient snapshot. For Module 09, `contact_id` is always set — Alert recipients resolve
+ * only to Contacts (never Users, never Guests; see claude/prompts/09-alert-engine.md, "Recipient
+ * source model"). `recipient_address` holds the immutable destination snapshot (normalized phone
+ * for SMS / email for EMAIL) captured at READY time — a deliberate PII-duplication exception, see
+ * "Destination snapshot rationale" in the module doc. Rows here represent only ELIGIBLE, resolved
+ * recipients; excluded candidates are never persisted per-row, only as safe counts on `alerts`.
  */
 export const alertRecipients = pgTable(
   "alert_recipients",
@@ -18,8 +21,11 @@ export const alertRecipients = pgTable(
     contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
     recipientName: varchar("recipient_name", { length: 255 }),
     recipientAddress: varchar("recipient_address", { length: 255 }),
+    /** This recipient's personalized final content — see module doc, "Content snapshot verification". */
+    renderedSubject: text("rendered_subject"),
+    renderedBody: text("rendered_body"),
     channel: varchar("channel", { length: 32 }).notNull(),
-    status: varchar("status", { length: 32 }).notNull().default("queued"),
+    status: varchar("status", { length: 32 }).notNull().default("pending_delivery"),
     providerMessageId: varchar("provider_message_id", { length: 255 }),
     queuedAt: timestamp("queued_at", { withTimezone: true }).notNull().defaultNow(),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
@@ -33,10 +39,15 @@ export const alertRecipients = pgTable(
     index("alert_recipients_alert_id_idx").on(table.alertId),
     index("alert_recipients_status_idx").on(table.status),
     index("alert_recipients_provider_message_id_idx").on(table.providerMessageId),
+    // One resolved recipient row per (Alert, Contact) — the database-level dedupe guarantee,
+    // mirroring incident_participants' partial unique indexes from Module 08.
+    uniqueIndex("alert_recipients_alert_contact_idx")
+      .on(table.alertId, table.contactId)
+      .where(sql`${table.contactId} IS NOT NULL`),
     check("alert_recipients_channel_check", sql`${table.channel} IN ('sms', 'email', 'voice', 'push')`),
     check(
       "alert_recipients_status_check",
-      sql`${table.status} IN ('queued', 'submitted', 'delivered', 'failed')`,
+      sql`${table.status} IN ('pending_delivery', 'queued', 'submitted', 'delivered', 'failed')`,
     ),
     check(
       "alert_recipients_target_check",

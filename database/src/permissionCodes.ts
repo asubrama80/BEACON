@@ -131,3 +131,24 @@ export const MODULE_08_PERMISSIONS = [
 ] as const;
 
 export type Module08PermissionCode = (typeof MODULE_08_PERMISSIONS)[number]["code"];
+
+/**
+ * Module 09's alert-engine permission codes. Same convention: seeded once, never renamed,
+ * shared by the seed script and `requirePermission()`. `alerts.recipients.read` is deliberately
+ * separate from `alerts.read` — recipient rows carry destination PII (phone/email), so viewing
+ * them is gated independently. See claude/prompts/09-alert-engine.md, "Recipient PII permission".
+ */
+export const MODULE_09_PERMISSIONS = [
+  { code: "alerts.read", name: "View alerts", description: "List and view BEACON Alerts (summary — no recipient PII)." },
+  { code: "alerts.create", name: "Create alerts", description: "Create a new draft Alert." },
+  { code: "alerts.update", name: "Update alerts", description: "Edit a draft Alert's content, audience, or context." },
+  { code: "alerts.ready", name: "Ready alerts", description: "Resolve recipients and transition an Alert to READY." },
+  { code: "alerts.cancel", name: "Cancel alerts", description: "Cancel a draft or ready Alert." },
+  {
+    code: "alerts.recipients.read",
+    name: "View alert recipients",
+    description: "View an Alert's resolved recipient list, including destination phone/email.",
+  },
+] as const;
+
+export type Module09PermissionCode = (typeof MODULE_09_PERMISSIONS)[number]["code"];

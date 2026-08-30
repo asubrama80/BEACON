@@ -1,0 +1,180 @@
+import type { FastifyInstance } from "fastify";
+import { getDb } from "@beacon/database";
+import type { AuthConfig } from "../auth/config.js";
+import { createAuthenticateHook } from "../auth/plugin.js";
+import { requireCsrf } from "../auth/csrf.js";
+import { requirePermission } from "../rbac/guard.js";
+import type { AlertConfig } from "./config.js";
+import * as alertsService from "./service.js";
+
+interface AlertsRoutesOptions {
+  config: AuthConfig;
+  alertConfig: AlertConfig;
+}
+
+const UUID_PATTERN = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
+
+const idParamSchema = {
+  type: "object",
+  required: ["id"],
+  properties: { id: { type: "string", pattern: UUID_PATTERN } },
+} as const;
+
+const listQuerySchema = {
+  type: "object",
+  properties: {
+    search: { type: "string", maxLength: 255 },
+    status: { type: "string", enum: ["draft", "ready", "cancelled"] },
+    channel: { type: "string", enum: ["sms", "email"] },
+    incidentId: { type: "string", pattern: UUID_PATTERN },
+    page: { type: "integer", minimum: 1 },
+    pageSize: { type: "integer", minimum: 1, maximum: 100 },
+  },
+} as const;
+
+const pageQuerySchema = {
+  type: "object",
+  properties: {
+    page: { type: "integer", minimum: 1 },
+    pageSize: { type: "integer", minimum: 1, maximum: 100 },
+  },
+} as const;
+
+const idList = { type: "array", items: { type: "string", pattern: UUID_PATTERN }, maxItems: 500 } as const;
+
+const createBodySchema = {
+  type: "object",
+  required: ["title", "channel", "contentSource"],
+  additionalProperties: false,
+  properties: {
+    title: { type: "string", minLength: 1, maxLength: 255 },
+    incidentId: { type: "string", pattern: UUID_PATTERN },
+    channel: { type: "string", enum: ["sms", "email"] },
+    contentSource: { type: "string", enum: ["template", "adhoc"] },
+    templateId: { type: "string", pattern: UUID_PATTERN },
+    subject: { type: "string", maxLength: 255 },
+    body: { type: "string", maxLength: 5000 },
+    contactIds: idList,
+    groupIds: idList,
+  },
+} as const;
+
+const updateBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    title: { type: "string", minLength: 1, maxLength: 255 },
+    incidentId: { type: ["string", "null"], pattern: UUID_PATTERN },
+    channel: { type: "string", enum: ["sms", "email"] },
+    contentSource: { type: "string", enum: ["template", "adhoc"] },
+    templateId: { type: ["string", "null"], pattern: UUID_PATTERN },
+    subject: { type: "string", maxLength: 255 },
+    body: { type: "string", maxLength: 5000 },
+    contactIds: idList,
+    groupIds: idList,
+  },
+} as const;
+
+export async function alertsRoutes(app: FastifyInstance, opts: AlertsRoutesOptions): Promise<void> {
+  const { config, alertConfig } = opts;
+  const authenticate = createAuthenticateHook(config);
+  const canRead = requirePermission("alerts.read");
+  const canCreate = requirePermission("alerts.create");
+  const canUpdate = requirePermission("alerts.update");
+  const canReady = requirePermission("alerts.ready");
+  const canCancel = requirePermission("alerts.cancel");
+  const canReadRecipients = requirePermission("alerts.recipients.read");
+
+  app.get(
+    "/alerts",
+    { preHandler: [authenticate, canRead], schema: { querystring: listQuerySchema } },
+    async (request) => {
+      const query = request.query as {
+        search?: string;
+        status?: string;
+        channel?: string;
+        incidentId?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      return alertsService.listAlerts(getDb(), query);
+    },
+  );
+
+  app.get(
+    "/alerts/:id",
+    { preHandler: [authenticate, canRead], schema: { params: idParamSchema } },
+    async (request) => {
+      const { id } = request.params as { id: string };
+      return { alert: await alertsService.getAlert(getDb(), id) };
+    },
+  );
+
+  app.post(
+    "/alerts",
+    { preHandler: [authenticate, canCreate], schema: { body: createBodySchema } },
+    async (request, reply) => {
+      requireCsrf(request, config);
+      const body = request.body as alertsService.CreateAlertInput;
+      const alert = await alertsService.createAlert(getDb(), body, request.authUser!.id);
+      reply.status(201);
+      return { alert };
+    },
+  );
+
+  app.patch(
+    "/alerts/:id",
+    { preHandler: [authenticate, canUpdate], schema: { params: idParamSchema, body: updateBodySchema } },
+    async (request) => {
+      requireCsrf(request, config);
+      const { id } = request.params as { id: string };
+      const body = request.body as alertsService.UpdateAlertInput;
+      const alert = await alertsService.updateAlert(getDb(), id, body, request.authUser!.id);
+      return { alert };
+    },
+  );
+
+  app.post(
+    "/alerts/:id/preview",
+    { preHandler: [authenticate, canUpdate], schema: { params: idParamSchema } },
+    async (request) => {
+      requireCsrf(request, config);
+      const { id } = request.params as { id: string };
+      return alertsService.previewAlert(getDb(), id);
+    },
+  );
+
+  app.post(
+    "/alerts/:id/ready",
+    { preHandler: [authenticate, canReady], schema: { params: idParamSchema } },
+    async (request) => {
+      requireCsrf(request, config);
+      const { id } = request.params as { id: string };
+      const alert = await alertsService.readyAlert(getDb(), id, request.authUser!.id, alertConfig);
+      return { alert };
+    },
+  );
+
+  app.post(
+    "/alerts/:id/cancel",
+    { preHandler: [authenticate, canCancel], schema: { params: idParamSchema } },
+    async (request) => {
+      requireCsrf(request, config);
+      const { id } = request.params as { id: string };
+      const alert = await alertsService.cancelAlert(getDb(), id, request.authUser!.id);
+      return { alert };
+    },
+  );
+
+  // Recipient rows carry destination PII (phone/email) — gated separately from alerts.read.
+  // See claude/prompts/09-alert-engine.md, "Recipient PII permission".
+  app.get(
+    "/alerts/:id/recipients",
+    { preHandler: [authenticate, canReadRecipients], schema: { params: idParamSchema, querystring: pageQuerySchema } },
+    async (request) => {
+      const { id } = request.params as { id: string };
+      const query = request.query as { page?: number; pageSize?: number };
+      return alertsService.listAlertRecipients(getDb(), id, query);
+    },
+  );
+}

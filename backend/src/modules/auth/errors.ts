@@ -25,7 +25,13 @@ export type AuthErrorCode =
   | "duplicate_template_name"
   | "invalid_transition"
   | "incident_closed"
-  | "duplicate_participant";
+  | "duplicate_participant"
+  | "alert_not_draft"
+  | "incident_not_eligible"
+  | "template_not_usable"
+  | "zero_eligible_recipients"
+  | "recipient_limit_exceeded"
+  | "invalid_group_selection";
 
 /**
  * A deliberately generic, safe error surfaced to the client — never a stack trace or DB

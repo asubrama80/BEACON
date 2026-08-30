@@ -64,6 +64,13 @@
       "when": 1788100104536,
       "tag": "0008_conscious_legion",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788102954672,
+      "tag": "0009_fearless_princess_powerful",
+      "breakpoints": true
     }
   ]
 }

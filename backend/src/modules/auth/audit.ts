@@ -44,7 +44,11 @@ export type AuthAuditEventType =
   | "INCIDENT_COMMANDER_ASSIGNED"
   | "INCIDENT_COMMANDER_CHANGED"
   | "INCIDENT_PARTICIPANT_ADDED"
-  | "INCIDENT_PARTICIPANT_REMOVED";
+  | "INCIDENT_PARTICIPANT_REMOVED"
+  | "ALERT_CREATED"
+  | "ALERT_UPDATED"
+  | "ALERT_READY"
+  | "ALERT_CANCELLED";
 
 export interface RecordAuthEventInput {
   eventType: AuthAuditEventType;

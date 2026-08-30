@@ -13,6 +13,7 @@ import {
   MODULE_07_PERMISSIONS,
   MODULE_08_PERMISSIONS,
   MODULE_09_PERMISSIONS,
+  MODULE_10_PERMISSIONS,
   type Module03PermissionCode,
   type Module04PermissionCode,
   type Module05PermissionCode,
@@ -20,6 +21,7 @@ import {
   type Module07PermissionCode,
   type Module08PermissionCode,
   type Module09PermissionCode,
+  type Module10PermissionCode,
 } from "./permissionCodes.js";
 
 const ROLE_NAMES: Record<SystemRoleCode, string> = {
@@ -56,6 +58,7 @@ const ALL_PERMISSIONS = [
   ...MODULE_07_PERMISSIONS,
   ...MODULE_08_PERMISSIONS,
   ...MODULE_09_PERMISSIONS,
+  ...MODULE_10_PERMISSIONS,
 ];
 type AnyPermissionCode =
   | Module03PermissionCode
@@ -64,7 +67,8 @@ type AnyPermissionCode =
   | Module06PermissionCode
   | Module07PermissionCode
   | Module08PermissionCode
-  | Module09PermissionCode;
+  | Module09PermissionCode
+  | Module10PermissionCode;
 
 /**
  * ADMIN gets full administrative control of every seeded permission. Other roles are granted
@@ -113,6 +117,7 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "alerts.ready",
     "alerts.cancel",
     "alerts.recipients.read",
+    "alerts.dispatch",
   ],
   COMMUNICATION_MANAGER: [
     "contacts.read",
@@ -137,6 +142,7 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "alerts.ready",
     "alerts.cancel",
     "alerts.recipients.read",
+    "alerts.dispatch",
   ],
   RESPONDER: [
     "incidents.read",

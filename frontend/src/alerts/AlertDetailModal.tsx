@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Modal from "../components/Modal";
-import { cancelAlert, getAlert, previewAlert, readyAlert, updateAlert } from "./api";
-import type { AlertDetail, AlertPreview } from "./types";
+import { cancelAlert, dispatchAlert, getAlert, getProviderStatus, previewAlert, readyAlert, updateAlert } from "./api";
+import type { AlertDetail, AlertPreview, ProviderStatus } from "./types";
 import { listContacts } from "../contacts/api";
 import type { Contact } from "../contacts/types";
 import { listGroups } from "../groups/api";
@@ -20,6 +20,15 @@ const STATUS_BADGE: Record<string, string> = {
   draft: "badge-neutral",
   ready: "badge-success",
   cancelled: "badge-warning",
+  dispatching: "badge-neutral",
+  submitted: "badge-success",
+  partially_submitted: "badge-warning",
+  submission_failed: "badge-critical",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  partially_submitted: "partially submitted",
+  submission_failed: "submission failed",
 };
 
 export default function AlertDetailModal({ alertId, onClose, onChanged }: AlertDetailModalProps): JSX.Element {
@@ -27,6 +36,7 @@ export default function AlertDetailModal({ alertId, onClose, onChanged }: AlertD
   const canUpdate = user?.permissions.includes("alerts.update") ?? false;
   const canReady = user?.permissions.includes("alerts.ready") ?? false;
   const canCancel = user?.permissions.includes("alerts.cancel") ?? false;
+  const canDispatch = user?.permissions.includes("alerts.dispatch") ?? false;
 
   const [tab, setTab] = useState<Tab>("overview");
   const [alert, setAlert] = useState<AlertDetail | null>(null);
@@ -37,8 +47,12 @@ export default function AlertDetailModal({ alertId, onClose, onChanged }: AlertD
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<AlertPreview | null>(null);
   const [confirmingReady, setConfirmingReady] = useState(false);
+  const [confirmingDispatch, setConfirmingDispatch] = useState(false);
+  const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
 
   const isDraft = alert?.status === "draft";
+  const isReady = alert?.status === "ready";
+  const hasSubmissionActivity = !!alert && (alert.submittedCount > 0 || alert.submissionFailedCount > 0);
 
   const refresh = useCallback(async () => {
     const fresh = await getAlert(alertId);
@@ -112,6 +126,31 @@ export default function AlertDetailModal({ alertId, onClose, onChanged }: AlertD
     }
   }
 
+  async function openDispatchConfirmation(): Promise<void> {
+    setError(null);
+    try {
+      setProviderStatus(await getProviderStatus());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load provider status.");
+      return;
+    }
+    setConfirmingDispatch(true);
+  }
+
+  async function confirmDispatch(): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      await dispatchAlert(alertId);
+      setConfirmingDispatch(false);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to dispatch this alert.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!alert) {
     return (
       <Modal title="Alert" onClose={onClose}>
@@ -135,7 +174,9 @@ export default function AlertDetailModal({ alertId, onClose, onChanged }: AlertD
       )}
 
       <div className="detail-section">
-        <span className={`badge ${STATUS_BADGE[alert.status] ?? "badge-neutral"}`}>{alert.status}</span>
+        <span className={`badge ${STATUS_BADGE[alert.status] ?? "badge-neutral"}`}>
+          {STATUS_LABEL[alert.status] ?? alert.status}
+        </span>
         <span className="cell-muted" style={{ marginLeft: 12 }}>
           {alert.channel.toUpperCase()} · {alert.incident ? alert.incident.incidentNumber : "Standalone"}
         </span>
@@ -146,13 +187,28 @@ export default function AlertDetailModal({ alertId, onClose, onChanged }: AlertD
         )}
       </div>
 
-      {alert.status === "ready" && (
+      {isReady && !hasSubmissionActivity && (
         <p className="warning-banner">
-          This alert is READY. Its content and recipient snapshot are frozen. Actual delivery is not implemented
-          yet (Module 10).
+          This alert is READY. Its content and recipient snapshot are frozen. It has not been dispatched to a
+          notification provider yet.
         </p>
       )}
       {alert.status === "cancelled" && <p className="warning-banner">This alert has been cancelled.</p>}
+
+      {hasSubmissionActivity && (
+        <div className="detail-section">
+          <div className="detail-section-title">Submission</div>
+          <p className="cell-primary">
+            {alert.submittedCount} submitted
+            {alert.submissionFailedCount > 0 && `, ${alert.submissionFailedCount} submission failed`}
+            {alert.pendingDispatchCount > 0 && `, ${alert.pendingDispatchCount} pending`}
+          </p>
+          <p className="cell-muted">
+            "Submitted" means the notification provider accepted the message — it does not confirm the recipient
+            received it.
+          </p>
+        </div>
+      )}
 
       <div className="tab-row" style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <button
@@ -302,7 +358,45 @@ export default function AlertDetailModal({ alertId, onClose, onChanged }: AlertD
             </div>
           )}
 
-          {(isDraft || alert.status === "ready") && canCancel && (
+          {isReady && canDispatch && (
+            <div className="detail-section">
+              <div className="detail-section-title">Dispatch</div>
+              {!confirmingDispatch ? (
+                <div className="detail-actions">
+                  <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => void openDispatchConfirmation()}>
+                    Dispatch Alert
+                  </button>
+                </div>
+              ) : (
+                <div className="card" style={{ padding: 14 }}>
+                  <p className="cell-primary">
+                    You are about to submit this {alert.channel.toUpperCase()} alert to {alert.eligibleRecipientCount}{" "}
+                    recipient{alert.eligibleRecipientCount === 1 ? "" : "s"}.
+                  </p>
+                  <p className="cell-muted">
+                    {alert.title} · {alert.incident ? `Incident ${alert.incident.incidentNumber}` : "Standalone"}
+                  </p>
+                  {providerStatus && (
+                    <p className={providerStatus.sms.provider === "mock" || providerStatus.email.provider === "mock" ? "cell-muted" : "warning-banner"}>
+                      {alert.channel === "sms"
+                        ? `Provider: ${providerStatus.sms.provider === "mock" ? "Mock / Development — no external SMS will be sent." : `${providerStatus.sms.provider} — this will send a real message.`}`
+                        : `Provider: ${providerStatus.email.provider === "mock" ? "Mock / Development — no external email will be sent." : `${providerStatus.email.provider} — this will send a real message.`}`}
+                    </p>
+                  )}
+                  <div className="form-actions">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfirmingDispatch(false)}>
+                      Cancel
+                    </button>
+                    <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => void confirmDispatch()}>
+                      Confirm Dispatch
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {(isDraft || isReady) && canCancel && (
             <div className="detail-section">
               <div className="detail-actions">
                 <button type="button" className="btn btn-danger btn-sm" disabled={busy} onClick={() => void handleCancel()}>

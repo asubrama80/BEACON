@@ -10,6 +10,15 @@ const STATUS_BADGE: Record<string, string> = {
   draft: "badge-neutral",
   ready: "badge-success",
   cancelled: "badge-warning",
+  dispatching: "badge-neutral",
+  submitted: "badge-success",
+  partially_submitted: "badge-warning",
+  submission_failed: "badge-critical",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  partially_submitted: "partially submitted",
+  submission_failed: "submission failed",
 };
 
 export default function AlertsPage(): JSX.Element {
@@ -52,7 +61,8 @@ export default function AlertsPage(): JSX.Element {
     <div className="alerts-page">
       <h2 className="page-heading">Alerts</h2>
       <p className="page-lede">
-        Emergency communication plans — prepared and reviewed here; actual delivery is a later module.
+        Emergency communication plans — prepared, reviewed, and dispatched to the notification provider here.
+        Delivery tracking (what happens after the provider accepts a message) is a later module.
       </p>
 
       <div className="toolbar">
@@ -69,6 +79,10 @@ export default function AlertsPage(): JSX.Element {
             <option value="">All Statuses</option>
             <option value="draft">Draft</option>
             <option value="ready">Ready</option>
+            <option value="dispatching">Dispatching</option>
+            <option value="submitted">Submitted</option>
+            <option value="partially_submitted">Partially Submitted</option>
+            <option value="submission_failed">Submission Failed</option>
             <option value="cancelled">Cancelled</option>
           </select>
           <select className="select" value={channel} onChange={(e) => setChannel(e.target.value)}>
@@ -114,7 +128,9 @@ export default function AlertsPage(): JSX.Element {
                   <td className="cell-muted">{alert.incident ? alert.incident.incidentNumber : "Standalone"}</td>
                   <td className="cell-muted">{alert.channel.toUpperCase()}</td>
                   <td>
-                    <span className={`badge ${STATUS_BADGE[alert.status] ?? "badge-neutral"}`}>{alert.status}</span>
+                    <span className={`badge ${STATUS_BADGE[alert.status] ?? "badge-neutral"}`}>
+                      {STATUS_LABEL[alert.status] ?? alert.status}
+                    </span>
                   </td>
                   <td className="cell-muted">{alert.eligibleRecipientCount ?? "—"}</td>
                   <td className="cell-muted">{new Date(alert.updatedAt).toLocaleString()}</td>

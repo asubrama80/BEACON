@@ -5,6 +5,8 @@ import type {
   AlertRecipientsListResponse,
   AlertsListResponse,
   ApiErrorBody,
+  DispatchSummary,
+  ProviderStatus,
 } from "./types";
 
 async function parseOrThrow<T>(response: Response): Promise<T> {
@@ -97,4 +99,14 @@ export async function listAlertRecipients(id: string, params: { page?: number } 
   if (params.page) query.set("page", String(params.page));
   const response = await apiFetch(`/alerts/${id}/recipients?${query.toString()}`);
   return parseOrThrow<AlertRecipientsListResponse>(response);
+}
+
+export async function dispatchAlert(id: string): Promise<DispatchSummary> {
+  const response = await apiFetch(`/alerts/${id}/dispatch`, { method: "POST" });
+  return parseOrThrow<DispatchSummary>(response);
+}
+
+export async function getProviderStatus(): Promise<ProviderStatus> {
+  const response = await apiFetch("/alerts/provider-status");
+  return parseOrThrow<ProviderStatus>(response);
 }

@@ -19,6 +19,8 @@ import { templatesRoutes } from "./modules/templates/routes.js";
 import { incidentsRoutes } from "./modules/incidents/routes.js";
 import { alertsRoutes } from "./modules/alerts/routes.js";
 import { loadAlertConfig, type AlertConfig } from "./modules/alerts/config.js";
+import { loadNotificationConfig, type NotificationConfig } from "./modules/notifications/config.js";
+import { getSmsProvider, getEmailProvider } from "./modules/notifications/providers/registry.js";
 
 export interface BuildAppOptions {
   env?: AppEnv;
@@ -26,6 +28,7 @@ export interface BuildAppOptions {
   mfaEncryptionKey?: Buffer;
   contactImportConfig?: ContactImportConfig;
   alertConfig?: AlertConfig;
+  notificationConfig?: NotificationConfig;
 }
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
@@ -34,6 +37,12 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const mfaEncryptionKey = options.mfaEncryptionKey ?? loadMfaEncryptionKey();
   const contactImportConfig = options.contactImportConfig ?? loadContactImportConfig();
   const alertConfig = options.alertConfig ?? loadAlertConfig();
+  const notificationConfig = options.notificationConfig ?? loadNotificationConfig();
+  // Fail fast at startup if an unsupported/misconfigured provider is selected — never wait until
+  // an operator tries to dispatch a real Alert to discover it. See
+  // claude/prompts/10-notification-providers.md, "Provider registry".
+  getSmsProvider(notificationConfig);
+  getEmailProvider(notificationConfig);
 
   const app = Fastify({ logger: env.nodeEnv !== "test" });
 
@@ -63,7 +72,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.register((instance) => groupsRoutes(instance, { config: authConfig }));
   app.register((instance) => templatesRoutes(instance, { config: authConfig }));
   app.register((instance) => incidentsRoutes(instance, { config: authConfig }));
-  app.register((instance) => alertsRoutes(instance, { config: authConfig, alertConfig }));
+  app.register((instance) => alertsRoutes(instance, { config: authConfig, alertConfig, notificationConfig }));
 
   app.setErrorHandler((error: FastifyError | AuthError, request, reply) => {
     if (error instanceof AuthError) {

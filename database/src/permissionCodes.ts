@@ -152,3 +152,20 @@ export const MODULE_09_PERMISSIONS = [
 ] as const;
 
 export type Module09PermissionCode = (typeof MODULE_09_PERMISSIONS)[number]["code"];
+
+/**
+ * Module 10's notification-provider permission code. Same convention: seeded once, never
+ * renamed, shared by the seed script and `requirePermission()`. Dispatch is deliberately its own
+ * permission, separate from `alerts.ready` — approving a communication plan (READY) and actually
+ * beginning external provider submission (Dispatch) are different operational decisions. See
+ * claude/prompts/10-notification-providers.md, "Permissions".
+ */
+export const MODULE_10_PERMISSIONS = [
+  {
+    code: "alerts.dispatch",
+    name: "Dispatch alerts",
+    description: "Submit a READY Alert's recipients to the configured notification provider.",
+  },
+] as const;
+
+export type Module10PermissionCode = (typeof MODULE_10_PERMISSIONS)[number]["code"];

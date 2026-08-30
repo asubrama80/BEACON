@@ -71,6 +71,13 @@
       "when": 1788102954672,
       "tag": "0009_fearless_princess_powerful",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788109677055,
+      "tag": "0010_woozy_banshee",
+      "breakpoints": true
     }
   ]
 }

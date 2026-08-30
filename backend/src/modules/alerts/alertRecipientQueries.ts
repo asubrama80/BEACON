@@ -11,6 +11,14 @@ const RECIPIENT_COLUMNS = {
   renderedSubject: alertRecipients.renderedSubject,
   renderedBody: alertRecipients.renderedBody,
   status: alertRecipients.status,
+  provider: alertRecipients.provider,
+  providerMessageId: alertRecipients.providerMessageId,
+  attemptCount: alertRecipients.attemptCount,
+  lastFailureClass: alertRecipients.lastFailureClass,
+  lastErrorCode: alertRecipients.lastErrorCode,
+  lastErrorSummary: alertRecipients.lastErrorSummary,
+  submittedAt: alertRecipients.submittedAt,
+  failedAt: alertRecipients.failedAt,
   createdAt: alertRecipients.createdAt,
 } as const;
 

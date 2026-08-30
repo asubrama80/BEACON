@@ -1,4 +1,4 @@
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { alerts, alertRecipients, type Database, type DbOrTx } from "@beacon/database";
 import { AuthError } from "../auth/errors.js";
 import { recordAuthEvent } from "../auth/audit.js";
@@ -34,7 +34,12 @@ import {
   type AlertDetailDto,
   type AlertRecipientDto,
   type AlertSummaryDto,
+  type DispatchSummaryDto,
 } from "./dto.js";
+import type { NotificationConfig } from "../notifications/config.js";
+import { getSmsProvider, getEmailProvider } from "../notifications/providers/registry.js";
+import { dispatchRecipients } from "../notifications/dispatchEngine.js";
+import { getPendingRecipients, getRecipientStatusCounts } from "../notifications/dispatchQueries.js";
 
 const TITLE_MAX_LENGTH = 255;
 const SUBJECT_MAX_LENGTH = 255;
@@ -123,11 +128,16 @@ async function loadDto(db: DbOrTx, id: string): Promise<AlertDetailDto> {
   if (!row) {
     throw new AuthError(404, "not_found", "Alert not found.");
   }
-  const [sourceContacts, sourceGroups] = await Promise.all([
+  const [sourceContacts, sourceGroups, counts] = await Promise.all([
     getContactSelectionSummaries(db, id),
     getGroupSelectionSummaries(db, id),
+    getRecipientStatusCounts(db, id),
   ]);
-  return toAlertDetailDto(row, sourceContacts, sourceGroups);
+  return toAlertDetailDto(row, sourceContacts, sourceGroups, {
+    submitted: counts.submitted,
+    submissionFailed: counts.submissionFailed,
+    pendingDelivery: counts.pendingDelivery,
+  });
 }
 
 export interface ListAlertsOptions {
@@ -563,30 +573,57 @@ export async function readyAlert(db: Database, id: string, actorId: string, conf
   return loadDto(db, id);
 }
 
+/**
+ * Cancellation rule, revised for Module 10 (see claude/prompts/10-notification-providers.md,
+ * "Cancellation semantics"): a READY Alert may still be cancelled only while every one of its
+ * recipient snapshots is still `pending_delivery` — i.e. dispatch has never actually claimed any
+ * of them. Once any recipient has moved past `pending_delivery` (claimed/dispatching/submitted/
+ * submission_failed), cancellation is rejected — BEACON never claims to "recall" a message that
+ * may already be in flight to (or accepted by) the provider.
+ */
 export async function cancelAlert(db: Database, id: string, actorId: string): Promise<AlertDetailDto> {
   await db.transaction(async (tx) => {
-    const now = new Date();
-    const result = await tx
-      .update(alerts)
-      .set({ status: "cancelled", cancelledAt: now, updatedAt: now })
-      .where(and(eq(alerts.id, id), or(eq(alerts.status, "draft"), eq(alerts.status, "ready"))))
-      .returning({ id: alerts.id, incidentId: alerts.incidentId, alertNumber: alerts.alertNumber, channel: alerts.channel });
-
-    if (result.length === 0) {
-      const [existing] = await tx.select({ status: alerts.status }).from(alerts).where(eq(alerts.id, id)).limit(1);
-      if (!existing) {
-        throw new AuthError(404, "not_found", "Alert not found.");
-      }
+    const current = await findAlertForUpdate(tx, id);
+    if (!current) {
+      throw new AuthError(404, "not_found", "Alert not found.");
+    }
+    const DISPATCH_STARTED_STATUSES = ["dispatching", "submitted", "partially_submitted", "submission_failed"];
+    if (DISPATCH_STARTED_STATUSES.includes(current.status)) {
+      throw new AuthError(
+        409,
+        "dispatch_already_started",
+        "This Alert's dispatch has already begun; it can no longer be cancelled.",
+      );
+    }
+    if (current.status !== "draft" && current.status !== "ready") {
       throw new AuthError(409, "invalid_transition", "Only a DRAFT or READY Alert can be cancelled.");
     }
+    if (current.status === "ready") {
+      const counts = await getRecipientStatusCounts(tx, id);
+      if (counts.total - counts.pendingDelivery > 0) {
+        throw new AuthError(
+          409,
+          "dispatch_already_started",
+          "This Alert's dispatch has already begun; it can no longer be cancelled.",
+        );
+      }
+    }
 
-    const [cancelled] = result;
-    if (cancelled!.incidentId) {
+    const now = new Date();
+    await tx.update(alerts).set({ status: "cancelled", cancelledAt: now, updatedAt: now }).where(eq(alerts.id, id));
+
+    const [row] = await tx
+      .select({ alertNumber: alerts.alertNumber, channel: alerts.channel })
+      .from(alerts)
+      .where(eq(alerts.id, id))
+      .limit(1);
+
+    if (current.incidentId) {
       await appendTimelineEvent(tx, {
-        incidentId: cancelled!.incidentId,
+        incidentId: current.incidentId,
         eventType: "ALERT_CANCELLED",
         actorUserId: actorId,
-        metadata: { alertId: id, channel: cancelled!.channel },
+        metadata: { alertId: id, channel: row!.channel },
       });
     }
     await recordAuthEvent(tx, {
@@ -594,8 +631,8 @@ export async function cancelAlert(db: Database, id: string, actorId: string): Pr
       actorId,
       resourceType: "alert",
       resourceId: id,
-      ...(cancelled!.incidentId ? { incidentId: cancelled!.incidentId } : {}),
-      metadata: { alertNumber: cancelled!.alertNumber },
+      ...(current.incidentId ? { incidentId: current.incidentId } : {}),
+      metadata: { alertNumber: row!.alertNumber },
     });
   });
 
@@ -621,4 +658,164 @@ export async function listAlertRecipients(
   const { page, pageSize } = normalizePagination(options.page, options.pageSize);
   const result = await queryAlertRecipients(db, alertId, { page, pageSize });
   return { items: result.items.map(toAlertRecipientDto), total: result.total, page, pageSize };
+}
+
+const DISPATCHABLE_FROM: readonly string[] = ["ready", "partially_submitted", "submission_failed"];
+
+function deriveAlertStatus(counts: Awaited<ReturnType<typeof getRecipientStatusCounts>>): AlertDetailDto["status"] {
+  if (counts.pendingDelivery > 0 || counts.dispatching > 0) return "dispatching";
+  if (counts.submissionFailed > 0 && counts.submitted > 0) return "partially_submitted";
+  if (counts.submissionFailed > 0) return "submission_failed";
+  return "submitted";
+}
+
+/**
+ * Explicit dispatch operation — READY only *approves* a communication plan; this is the
+ * deliberate, separate action that actually begins provider submission. See module doc,
+ * "READY vs Dispatch". Idempotent and safely re-invokable: recipients already claimed by an
+ * earlier call (submitted or submission_failed) are never resubmitted — see
+ * claude/prompts/10-notification-providers.md, "Idempotency model".
+ */
+export async function dispatchAlert(
+  db: Database,
+  id: string,
+  actorId: string,
+  notificationConfig: NotificationConfig,
+): Promise<DispatchSummaryDto> {
+  const current = await findAlertById(db, id);
+  if (!current) {
+    throw new AuthError(404, "not_found", "Alert not found.");
+  }
+
+  if (current.status === "submitted") {
+    // Idempotent no-op: fully submitted already — report the current state, not an error.
+    const counts = await getRecipientStatusCounts(db, id);
+    return {
+      alertId: id,
+      status: "submitted",
+      totalRecipients: counts.total,
+      submitted: counts.submitted,
+      submissionFailed: counts.submissionFailed,
+      pending: counts.pendingDelivery,
+    };
+  }
+  if (current.status === "draft") {
+    throw new AuthError(409, "alert_not_ready", "Only a READY Alert can be dispatched.");
+  }
+  if (current.status === "cancelled") {
+    throw new AuthError(409, "alert_cancelled", "A cancelled Alert cannot be dispatched.");
+  }
+  if (current.status === "dispatching") {
+    throw new AuthError(409, "dispatch_in_progress", "This Alert's dispatch is already in progress.");
+  }
+  if (!DISPATCHABLE_FROM.includes(current.status)) {
+    throw new AuthError(409, "alert_not_ready", "Only a READY Alert can be dispatched.");
+  }
+
+  if (current.incidentId) {
+    const incident = await findIncidentById(db, current.incidentId);
+    if (!incident) {
+      throw new AuthError(400, "invalid_request", "Linked Incident not found.");
+    }
+    // Once dispatch validly begins below, a later Incident closure does not interrupt in-flight
+    // recipient processing for this same call — see module doc, "Incident CLOSED behavior".
+    if (incident.status === "closed") {
+      throw new AuthError(409, "incident_not_eligible", "This Incident is closed; the Alert cannot be dispatched.");
+    }
+  }
+
+  const preCounts = await getRecipientStatusCounts(db, id);
+  if (preCounts.total === 0) {
+    throw new AuthError(409, "no_recipients", "This Alert has no recipient snapshot to dispatch.");
+  }
+
+  // Resolve providers before mutating anything — an unsupported/misconfigured provider fails
+  // safely without ever marking the Alert as dispatching. See module doc, "Provider registry".
+  const providers = { sms: getSmsProvider(notificationConfig), email: getEmailProvider(notificationConfig) };
+
+  const [claimed] = await db
+    .update(alerts)
+    .set({ status: "dispatching", updatedAt: new Date() })
+    .where(and(eq(alerts.id, id), inArray(alerts.status, [...DISPATCHABLE_FROM])))
+    .returning({ id: alerts.id, incidentId: alerts.incidentId, channel: alerts.channel, alertNumber: alerts.alertNumber });
+
+  if (!claimed) {
+    // Lost a race against a concurrent dispatch call for the same Alert — the other request owns
+    // this dispatch; report a clean conflict rather than silently proceeding.
+    throw new AuthError(409, "dispatch_in_progress", "This Alert's dispatch is already in progress.");
+  }
+
+  try {
+    if (claimed.incidentId) {
+      await appendTimelineEvent(db, {
+        incidentId: claimed.incidentId,
+        eventType: "ALERT_DISPATCH_STARTED",
+        actorUserId: actorId,
+        metadata: { alertId: id, channel: claimed.channel },
+      });
+    }
+    await recordAuthEvent(db, {
+      eventType: "ALERT_DISPATCH_STARTED",
+      actorId,
+      resourceType: "alert",
+      resourceId: id,
+      ...(claimed.incidentId ? { incidentId: claimed.incidentId } : {}),
+      metadata: { alertNumber: claimed.alertNumber, channel: claimed.channel, provider: providerNameFor(claimed.channel, providers) },
+    });
+
+    const pending = await getPendingRecipients(db, id);
+    await dispatchRecipients(db, id, pending, providers, {
+      maxAttempts: notificationConfig.maxAttempts,
+      retryBaseMs: notificationConfig.retryBaseMs,
+      concurrency: notificationConfig.dispatchConcurrency,
+      providerTimeoutMs: notificationConfig.providerTimeoutMs,
+    });
+
+    const counts = await getRecipientStatusCounts(db, id);
+    const finalStatus = deriveAlertStatus(counts);
+    await db.update(alerts).set({ status: finalStatus, updatedAt: new Date() }).where(eq(alerts.id, id));
+
+    if (claimed.incidentId) {
+      await appendTimelineEvent(db, {
+        incidentId: claimed.incidentId,
+        eventType: "ALERT_DISPATCH_COMPLETED",
+        actorUserId: actorId,
+        metadata: { alertId: id, channel: claimed.channel, submittedCount: counts.submitted, failedCount: counts.submissionFailed },
+      });
+    }
+    await recordAuthEvent(db, {
+      eventType: "ALERT_DISPATCH_COMPLETED",
+      actorId,
+      resourceType: "alert",
+      resourceId: id,
+      ...(claimed.incidentId ? { incidentId: claimed.incidentId } : {}),
+      metadata: {
+        alertNumber: claimed.alertNumber,
+        channel: claimed.channel,
+        totalCount: counts.total,
+        submittedCount: counts.submitted,
+        failedCount: counts.submissionFailed,
+      },
+    });
+
+    return {
+      alertId: id,
+      status: finalStatus,
+      totalRecipients: counts.total,
+      submitted: counts.submitted,
+      submissionFailed: counts.submissionFailed,
+      pending: counts.pendingDelivery,
+    };
+  } catch (error) {
+    // Never leave the Alert stuck in "dispatching" on an unexpected error — recompute from
+    // whatever recipient state actually exists so the Alert reflects reality.
+    const counts = await getRecipientStatusCounts(db, id);
+    const fallbackStatus = counts.total > 0 ? deriveAlertStatus(counts) : "submission_failed";
+    await db.update(alerts).set({ status: fallbackStatus, updatedAt: new Date() }).where(eq(alerts.id, id));
+    throw error;
+  }
+}
+
+function providerNameFor(channel: string, providers: { sms: { name: string }; email: { name: string } }): string {
+  return channel === "sms" ? providers.sms.name : providers.email.name;
 }

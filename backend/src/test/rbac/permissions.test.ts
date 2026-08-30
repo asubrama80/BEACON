@@ -111,6 +111,7 @@ describe.skipIf(!process.env.DATABASE_URL)("effective permissions (live database
       [
         "alerts.cancel",
         "alerts.create",
+        "alerts.dispatch",
         "alerts.read",
         "alerts.ready",
         "alerts.recipients.read",

@@ -1,5 +1,12 @@
 export type AlertChannel = "sms" | "email";
-export type AlertStatus = "draft" | "ready" | "cancelled";
+export type AlertStatus =
+  | "draft"
+  | "ready"
+  | "cancelled"
+  | "dispatching"
+  | "submitted"
+  | "partially_submitted"
+  | "submission_failed";
 export type AlertContentSource = "template" | "adhoc";
 
 export interface IncidentSummaryRef {
@@ -52,6 +59,9 @@ export interface AlertDetail extends AlertSummary {
   sourceGroupCount: number;
   sourceContacts: SourceContactRef[];
   sourceGroups: SourceGroupRef[];
+  submittedCount: number;
+  submissionFailedCount: number;
+  pendingDispatchCount: number;
 }
 
 export interface AlertsListResponse {
@@ -85,6 +95,14 @@ export interface AlertRecipient {
   renderedSubject: string | null;
   renderedBody: string | null;
   status: string;
+  provider: string | null;
+  providerMessageId: string | null;
+  attemptCount: number;
+  lastFailureClass: string | null;
+  lastErrorCode: string | null;
+  lastErrorSummary: string | null;
+  submittedAt: string | null;
+  failedAt: string | null;
   createdAt: string;
 }
 
@@ -93,6 +111,20 @@ export interface AlertRecipientsListResponse {
   total: number;
   page: number;
   pageSize: number;
+}
+
+export interface DispatchSummary {
+  alertId: string;
+  status: AlertStatus;
+  totalRecipients: number;
+  submitted: number;
+  submissionFailed: number;
+  pending: number;
+}
+
+export interface ProviderStatus {
+  sms: { provider: string; configured: boolean };
+  email: { provider: string; configured: boolean };
 }
 
 export interface ApiErrorBody {

@@ -1,5 +1,12 @@
 export type AlertChannel = "sms" | "email";
-export type AlertStatus = "draft" | "ready" | "cancelled";
+export type AlertStatus =
+  | "draft"
+  | "ready"
+  | "cancelled"
+  | "dispatching"
+  | "submitted"
+  | "partially_submitted"
+  | "submission_failed";
 export type AlertContentSource = "template" | "adhoc";
 
 export interface IncidentSummaryRef {
@@ -59,6 +66,10 @@ export interface AlertDetailDto extends AlertSummaryDto {
    */
   sourceContacts: SourceContactRef[];
   sourceGroups: SourceGroupRef[];
+  /** Provider-submission outcome counts (Module 10) — safe totals only, never per-recipient. */
+  submittedCount: number;
+  submissionFailedCount: number;
+  pendingDispatchCount: number;
 }
 
 export interface AlertRow {
@@ -112,10 +123,17 @@ export function toAlertSummaryDto(row: AlertRow): AlertSummaryDto {
   };
 }
 
+export interface SubmissionCounts {
+  submitted: number;
+  submissionFailed: number;
+  pendingDelivery: number;
+}
+
 export function toAlertDetailDto(
   row: AlertRow,
   sourceContacts: SourceContactRef[] = [],
   sourceGroups: SourceGroupRef[] = [],
+  submission: SubmissionCounts = { submitted: 0, submissionFailed: 0, pendingDelivery: 0 },
 ): AlertDetailDto {
   return {
     ...toAlertSummaryDto(row),
@@ -128,6 +146,9 @@ export function toAlertDetailDto(
     sourceGroupCount: row.sourceGroupCount,
     sourceContacts,
     sourceGroups,
+    submittedCount: submission.submitted,
+    submissionFailedCount: submission.submissionFailed,
+    pendingDispatchCount: submission.pendingDelivery,
   };
 }
 
@@ -141,6 +162,14 @@ export interface AlertRecipientDto {
   renderedSubject: string | null;
   renderedBody: string | null;
   status: string;
+  provider: string | null;
+  providerMessageId: string | null;
+  attemptCount: number;
+  lastFailureClass: string | null;
+  lastErrorCode: string | null;
+  lastErrorSummary: string | null;
+  submittedAt: string | null;
+  failedAt: string | null;
   createdAt: string;
 }
 
@@ -153,6 +182,14 @@ export interface AlertRecipientRow {
   renderedSubject: string | null;
   renderedBody: string | null;
   status: string;
+  provider: string | null;
+  providerMessageId: string | null;
+  attemptCount: number;
+  lastFailureClass: string | null;
+  lastErrorCode: string | null;
+  lastErrorSummary: string | null;
+  submittedAt: Date | null;
+  failedAt: Date | null;
   createdAt: Date;
 }
 
@@ -166,6 +203,24 @@ export function toAlertRecipientDto(row: AlertRecipientRow): AlertRecipientDto {
     renderedSubject: row.renderedSubject,
     renderedBody: row.renderedBody,
     status: row.status,
+    provider: row.provider,
+    providerMessageId: row.providerMessageId,
+    attemptCount: row.attemptCount,
+    lastFailureClass: row.lastFailureClass,
+    lastErrorCode: row.lastErrorCode,
+    lastErrorSummary: row.lastErrorSummary,
+    submittedAt: row.submittedAt ? row.submittedAt.toISOString() : null,
+    failedAt: row.failedAt ? row.failedAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+/** Safe operational summary — never provider credentials, never the full destination list. */
+export interface DispatchSummaryDto {
+  alertId: string;
+  status: AlertStatus;
+  totalRecipients: number;
+  submitted: number;
+  submissionFailed: number;
+  pending: number;
 }

@@ -14,7 +14,7 @@ Work proceeds one module at a time, in order, unless the user directs otherwise.
 - [x] 07 Templates
 - [x] 08 Incident Management
 - [x] 09 Alert Engine
-- [ ] 10 Notification Providers
+- [x] 10 Notification Providers
 - [ ] 11 Delivery Tracking
 - [ ] 12 Incident Command Center
 - [ ] 13 Realtime Incident Chat

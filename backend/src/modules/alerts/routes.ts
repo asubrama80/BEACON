@@ -5,11 +5,14 @@ import { createAuthenticateHook } from "../auth/plugin.js";
 import { requireCsrf } from "../auth/csrf.js";
 import { requirePermission } from "../rbac/guard.js";
 import type { AlertConfig } from "./config.js";
+import type { NotificationConfig } from "../notifications/config.js";
+import { getProviderStatus } from "../notifications/providers/registry.js";
 import * as alertsService from "./service.js";
 
 interface AlertsRoutesOptions {
   config: AuthConfig;
   alertConfig: AlertConfig;
+  notificationConfig: NotificationConfig;
 }
 
 const UUID_PATTERN = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
@@ -76,7 +79,7 @@ const updateBodySchema = {
 } as const;
 
 export async function alertsRoutes(app: FastifyInstance, opts: AlertsRoutesOptions): Promise<void> {
-  const { config, alertConfig } = opts;
+  const { config, alertConfig, notificationConfig } = opts;
   const authenticate = createAuthenticateHook(config);
   const canRead = requirePermission("alerts.read");
   const canCreate = requirePermission("alerts.create");
@@ -84,6 +87,12 @@ export async function alertsRoutes(app: FastifyInstance, opts: AlertsRoutesOptio
   const canReady = requirePermission("alerts.ready");
   const canCancel = requirePermission("alerts.cancel");
   const canReadRecipients = requirePermission("alerts.recipients.read");
+  const canDispatch = requirePermission("alerts.dispatch");
+
+  // Safe, secret-free provider metadata (e.g. "sms: mock") — never credential values. Gated on
+  // alerts.dispatch since only an operator who can actually dispatch needs this. See
+  // claude/prompts/10-notification-providers.md, "Mock provider live validation".
+  app.get("/alerts/provider-status", { preHandler: [authenticate, canDispatch] }, () => getProviderStatus(notificationConfig));
 
   app.get(
     "/alerts",
@@ -163,6 +172,19 @@ export async function alertsRoutes(app: FastifyInstance, opts: AlertsRoutesOptio
       const { id } = request.params as { id: string };
       const alert = await alertsService.cancelAlert(getDb(), id, request.authUser!.id);
       return { alert };
+    },
+  );
+
+  // Separate from alerts.ready — approving a plan (READY) and beginning external provider
+  // submission (Dispatch) are different operational decisions. See
+  // claude/prompts/10-notification-providers.md, "READY vs Dispatch".
+  app.post(
+    "/alerts/:id/dispatch",
+    { preHandler: [authenticate, canDispatch], schema: { params: idParamSchema } },
+    async (request) => {
+      requireCsrf(request, config);
+      const { id } = request.params as { id: string };
+      return alertsService.dispatchAlert(getDb(), id, request.authUser!.id, notificationConfig);
     },
   );
 

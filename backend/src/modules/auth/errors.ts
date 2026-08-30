@@ -31,7 +31,12 @@ export type AuthErrorCode =
   | "template_not_usable"
   | "zero_eligible_recipients"
   | "recipient_limit_exceeded"
-  | "invalid_group_selection";
+  | "invalid_group_selection"
+  | "alert_not_ready"
+  | "alert_cancelled"
+  | "dispatch_in_progress"
+  | "dispatch_already_started"
+  | "no_recipients";
 
 /**
  * A deliberately generic, safe error surfaced to the client — never a stack trace or DB

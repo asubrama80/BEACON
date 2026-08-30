@@ -11,7 +11,15 @@ const ADMIN_USER = {
   isBreakGlass: false,
   mfaEnabled: false,
   roles: ["ADMIN"],
-  permissions: ["alerts.read", "alerts.create", "alerts.update", "alerts.ready", "alerts.cancel", "alerts.recipients.read"],
+  permissions: [
+    "alerts.read",
+    "alerts.create",
+    "alerts.update",
+    "alerts.ready",
+    "alerts.cancel",
+    "alerts.recipients.read",
+    "alerts.dispatch",
+  ],
 };
 
 const DRAFT_ALERT = {
@@ -42,6 +50,9 @@ const DRAFT_ALERT_DETAIL = {
   sourceGroupCount: 0,
   sourceContacts: [],
   sourceGroups: [],
+  submittedCount: 0,
+  submissionFailedCount: 0,
+  pendingDispatchCount: 0,
 };
 
 function mockRoutes(overrides: Record<string, () => unknown> = {}): void {
@@ -166,5 +177,93 @@ describe("AlertsPage", () => {
       expect(screen.getByText(/This alert is READY/)).toBeInTheDocument();
     });
     expect(screen.queryByRole("button", { name: "Save details" })).not.toBeInTheDocument();
+  });
+
+  it("dispatches a READY alert with an explicit confirmation showing mock-provider labeling", async () => {
+    let dispatched = false;
+    mockRoutes({
+      [`GET /alerts/${DRAFT_ALERT.id}`]: () => ({
+        alert: { ...DRAFT_ALERT_DETAIL, status: "ready", eligibleRecipientCount: 2, excludedCount: 0 },
+      }),
+      "GET /alerts/provider-status": () => ({
+        sms: { provider: "mock", configured: true },
+        email: { provider: "mock", configured: true },
+      }),
+      [`POST /alerts/${DRAFT_ALERT.id}/dispatch`]: () => {
+        dispatched = true;
+        return { alertId: DRAFT_ALERT.id, status: "submitted", totalRecipients: 2, submitted: 2, submissionFailed: 0, pending: 0 };
+      },
+    });
+    renderAlertsPage();
+
+    fireEvent.click(await screen.findByText("Cybersecurity Test Alert"));
+    fireEvent.click(await screen.findByRole("button", { name: "Dispatch Alert" }));
+
+    await screen.findByText(/Mock \/ Development/);
+    expect(screen.getByText(/You are about to submit this SMS alert to 2 recipients/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Dispatch" }));
+
+    await waitFor(() => {
+      expect(dispatched).toBe(true);
+    });
+  });
+
+  it("shows the submission summary after dispatch, never claiming delivery", async () => {
+    mockRoutes({
+      [`GET /alerts/${DRAFT_ALERT.id}`]: () => ({
+        alert: {
+          ...DRAFT_ALERT_DETAIL,
+          status: "submitted",
+          eligibleRecipientCount: 2,
+          submittedCount: 2,
+          submissionFailedCount: 0,
+          pendingDispatchCount: 0,
+        },
+      }),
+    });
+    renderAlertsPage();
+
+    fireEvent.click(await screen.findByText("Cybersecurity Test Alert"));
+
+    await screen.findByText(/2 submitted/);
+    expect(screen.queryByText(/delivered/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Dispatch Alert" })).not.toBeInTheDocument();
+  });
+
+  it("does not show the Dispatch control for a user without alerts.dispatch", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL, init?: RequestInit) => {
+        const path = new URL(String(input)).pathname;
+        const method = (init?.method ?? "GET").toUpperCase();
+        if (path === "/auth/me") {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                user: { ...ADMIN_USER, roles: ["RESPONDER"], permissions: ["alerts.read"] },
+              }),
+          });
+        }
+        if (path === "/alerts" && method === "GET") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [DRAFT_ALERT], total: 1, page: 1, pageSize: 25 }) });
+        }
+        if (path === `/alerts/${DRAFT_ALERT.id}` && method === "GET") {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ alert: { ...DRAFT_ALERT_DETAIL, status: "ready", eligibleRecipientCount: 2 } }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }),
+    );
+    renderAlertsPage();
+
+    fireEvent.click(await screen.findByText("Cybersecurity Test Alert"));
+    await waitFor(() => {
+      expect(screen.getByText(/This alert is READY/)).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: "Dispatch Alert" })).not.toBeInTheDocument();
   });
 });

@@ -12,10 +12,13 @@ import { users } from "./users.js";
 export const alertNumberSeq = pgSequence("alert_number_seq", { startWith: 1, increment: 1 });
 
 /**
- * Alert dispatch record foundation. Module 09 (this module) owns DRAFT/READY/CANCELLED —
- * QUEUED/SENDING/SENT/FAILED remain structurally allowed (Module 01's original check constraint)
- * for a future Module 10/11 to use; Module 09's own code never writes them. See
- * claude/prompts/09-alert-engine.md, "Alert lifecycle".
+ * Alert dispatch record foundation. Module 09 owns DRAFT/READY/CANCELLED. Module 10 owns
+ * DISPATCHING/SUBMITTED/PARTIALLY_SUBMITTED/SUBMISSION_FAILED — an Alert-level aggregate of its
+ * recipients' provider-submission outcomes, never "delivered" (that's Module 11's job). The
+ * original Module 01 placeholders QUEUED/SENDING/SENT/FAILED remain structurally allowed but
+ * unused — superseded by these more precise values. See
+ * claude/prompts/09-alert-engine.md, "Alert lifecycle" and
+ * claude/prompts/10-notification-providers.md, "Alert vs recipient submission state".
  */
 export const alerts = pgTable(
   "alerts",
@@ -59,7 +62,7 @@ export const alerts = pgTable(
     check("alerts_content_source_check", sql`${table.contentSource} IN ('template', 'adhoc')`),
     check(
       "alerts_status_check",
-      sql`${table.status} IN ('draft', 'ready', 'cancelled', 'queued', 'sending', 'sent', 'failed')`,
+      sql`${table.status} IN ('draft', 'ready', 'cancelled', 'dispatching', 'submitted', 'partially_submitted', 'submission_failed', 'queued', 'sending', 'sent', 'failed')`,
     ),
   ],
 );

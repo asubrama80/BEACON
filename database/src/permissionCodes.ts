@@ -202,3 +202,16 @@ export const MODULE_12_PERMISSIONS = [
 ] as const;
 
 export type Module12PermissionCode = (typeof MODULE_12_PERMISSIONS)[number]["code"];
+
+/**
+ * Module 13's realtime incident chat permission codes. `incidents.chat.send` is deliberately
+ * separate from `incidents.chat.read` — AUDITOR gets read-only access to chat history for
+ * compliance review, consistent with its existing read-only posture everywhere else, without
+ * being able to participate. See claude/prompts/13-realtime-incident-chat.md, "Permissions".
+ */
+export const MODULE_13_PERMISSIONS = [
+  { code: "incidents.chat.read", name: "View incident chat", description: "View an Incident's chat message history." },
+  { code: "incidents.chat.send", name: "Send incident chat messages", description: "Send messages in an Incident's chat." },
+] as const;
+
+export type Module13PermissionCode = (typeof MODULE_13_PERMISSIONS)[number]["code"];

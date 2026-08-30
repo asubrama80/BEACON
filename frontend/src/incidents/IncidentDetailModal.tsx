@@ -21,6 +21,7 @@ import type { UserSummary } from "../users/types";
 import { listContacts } from "../contacts/api";
 import type { Contact } from "../contacts/types";
 import { useAuth } from "../auth/useAuth";
+import ChatPanel from "../chat/ChatPanel";
 
 interface NavigateToAlertsRequest {
   alertId?: string;
@@ -35,7 +36,7 @@ interface IncidentDetailModalProps {
   onNavigateToAlerts?: (request: NavigateToAlertsRequest) => void;
 }
 
-type Tab = "overview" | "commandCenter" | "participants" | "timeline";
+type Tab = "overview" | "commandCenter" | "participants" | "timeline" | "chat";
 
 const STATUS_BADGE: Record<string, string> = {
   open: "badge-neutral",
@@ -60,6 +61,8 @@ export default function IncidentDetailModal({
   const canReadTimeline = user?.permissions.includes("incidents.timeline.read") ?? false;
   const canReadCommandCenter = user?.permissions.includes("incidents.command_center.read") ?? false;
   const canCreateAlert = user?.permissions.includes("alerts.create") ?? false;
+  const canReadChat = user?.permissions.includes("incidents.chat.read") ?? false;
+  const canSendChat = user?.permissions.includes("incidents.chat.send") ?? false;
 
   const [tab, setTab] = useState<Tab>("overview");
   const [incident, setIncident] = useState<Incident | null>(null);
@@ -180,6 +183,15 @@ export default function IncidentDetailModal({
         >
           Timeline
         </button>
+        {canReadChat && (
+          <button
+            type="button"
+            className={`btn btn-sm ${tab === "chat" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setTab("chat")}
+          >
+            Chat
+          </button>
+        )}
       </div>
 
       {tab === "overview" && (
@@ -235,6 +247,10 @@ export default function IncidentDetailModal({
       )}
 
       {tab === "timeline" && <TimelineTab incidentId={incidentId} canRead={canReadTimeline} />}
+
+      {tab === "chat" && user && (
+        <ChatPanel incidentId={incidentId} canRead={canReadChat} canSend={canSendChat} isClosed={isClosed} currentUserId={user.id} />
+      )}
     </Modal>
   );
 }

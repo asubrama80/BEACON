@@ -1,6 +1,13 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
 const CSRF_COOKIE_NAME = "beacon_csrf";
 
+/** Builds a same-backend WebSocket URL (ws:// for http://, wss:// for https://) — used by Module
+ * 13's realtime incident chat. The browser attaches the session cookie to the WS handshake
+ * automatically (same-site cookie rules), so no token is ever placed in this URL. */
+export function apiWsUrl(path: string): string {
+  return `${API_BASE_URL.replace(/^http/, "ws")}${path}`;
+}
+
 function readCookie(name: string): string | undefined {
   const prefix = `${name}=`;
   return document.cookie

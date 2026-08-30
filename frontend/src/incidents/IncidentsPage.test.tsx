@@ -20,6 +20,8 @@ const ADMIN_USER = {
     "incidents.participants.manage",
     "incidents.timeline.read",
     "incidents.command_center.read",
+    "incidents.chat.read",
+    "incidents.chat.send",
     "alerts.create",
     "contacts.read",
   ],
@@ -408,6 +410,75 @@ describe("IncidentsPage", () => {
         expect(screen.getByRole("button", { name: "Overview" })).toBeInTheDocument();
       });
       expect(screen.queryByRole("button", { name: "Command Center" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Chat tab", () => {
+    class MockWebSocket {
+      static OPEN = 1;
+      static instances: MockWebSocket[] = [];
+      url: string;
+      onopen: (() => void) | null = null;
+      onmessage: ((event: { data: string }) => void) | null = null;
+      onclose: (() => void) | null = null;
+      readyState = 0;
+      constructor(url: string) {
+        this.url = url;
+        MockWebSocket.instances.push(this);
+      }
+      send(): void {
+        /* not exercised at this level — see ChatPanel.test.tsx for send-path coverage */
+      }
+      close(): void {
+        this.readyState = 3;
+      }
+    }
+
+    it("shows the Chat tab and connects when the caller has incidents.chat.read", async () => {
+      vi.stubGlobal("WebSocket", MockWebSocket);
+      MockWebSocket.instances = [];
+      mockRoutes({
+        [`GET /incidents/${OPEN_INCIDENT.id}/chat/messages`]: () => ({ items: [], hasMore: false }),
+      });
+      renderIncidentsPage();
+
+      fireEvent.click(await screen.findByText("Potential Cybersecurity Incident"));
+      fireEvent.click(await screen.findByRole("button", { name: "Chat" }));
+
+      await waitFor(() => {
+        expect(MockWebSocket.instances.length).toBeGreaterThan(0);
+      });
+      vi.unstubAllGlobals();
+    });
+
+    it("hides the Chat tab for a user without incidents.chat.read", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: string | URL, init?: RequestInit) => {
+          const path = new URL(String(input)).pathname;
+          const method = (init?.method ?? "GET").toUpperCase();
+          if (path === "/auth/me") {
+            return Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve({ user: { ...ADMIN_USER, permissions: ["incidents.read", "incidents.timeline.read"] } }),
+            });
+          }
+          if (path === "/incidents" && method === "GET") {
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [OPEN_INCIDENT], total: 1, page: 1, pageSize: 25 }) });
+          }
+          if (path === `/incidents/${OPEN_INCIDENT.id}` && method === "GET") {
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ incident: OPEN_INCIDENT }) });
+          }
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+        }),
+      );
+      renderIncidentsPage();
+
+      fireEvent.click(await screen.findByText("Potential Cybersecurity Incident"));
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Overview" })).toBeInTheDocument();
+      });
+      expect(screen.queryByRole("button", { name: "Chat" })).not.toBeInTheDocument();
     });
   });
 });

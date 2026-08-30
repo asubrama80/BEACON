@@ -4,6 +4,7 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
 import formbody from "@fastify/formbody";
+import websocket from "@fastify/websocket";
 import { closeDb } from "@beacon/database";
 import { loadEnv, type AppEnv } from "./config/env.js";
 import { healthRoutes } from "./routes/health.js";
@@ -23,6 +24,7 @@ import { loadAlertConfig, type AlertConfig } from "./modules/alerts/config.js";
 import { loadNotificationConfig, type NotificationConfig } from "./modules/notifications/config.js";
 import { getSmsProvider, getEmailProvider } from "./modules/notifications/providers/registry.js";
 import { webhooksRoutes } from "./modules/notifications/webhooks/routes.js";
+import { chatRoutes } from "./modules/chat/routes.js";
 
 export interface BuildAppOptions {
   env?: AppEnv;
@@ -68,6 +70,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
   // Only needed for the Twilio status-callback webhook's application/x-www-form-urlencoded body.
   app.register(formbody);
+  // Module 13's incident chat transport. A bounded maxPayload is the primary defense against an
+  // oversized WebSocket frame — see claude/prompts/13-realtime-incident-chat.md, "Payload
+  // validation".
+  app.register(websocket, { options: { maxPayload: 16 * 1024 } });
 
   app.register((instance) => healthRoutes(instance, env));
   app.register((instance) => authRoutes(instance, { config: authConfig, mfaEncryptionKey }));
@@ -82,6 +88,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // Isolated from the rest of the application — no session auth/CSRF, provider-signature
   // authenticity instead. See claude/prompts/11-delivery-tracking.md, "Webhook routes".
   app.register((instance) => webhooksRoutes(instance, { notificationConfig, ...(options.sesFetchCert ? { sesFetchCert: options.sesFetchCert } : {}) }));
+  app.register((instance) => chatRoutes(instance, { config: authConfig, corsOrigin: env.corsOrigin }));
 
   app.setErrorHandler((error: FastifyError | AuthError, request, reply) => {
     if (error instanceof AuthError) {

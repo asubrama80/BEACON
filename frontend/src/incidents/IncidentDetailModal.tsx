@@ -731,13 +731,34 @@ function ParticipantsTab({ incidentId, canRead, canManage, onRosterChanged }: Pa
             <tbody>
               {participants.map((p) => (
                 <tr key={p.id}>
-                  <td className="cell-primary">{p.displayName}</td>
-                  <td className="cell-muted">{p.participantType === "user" ? "BEACON Responder" : "Contact"}</td>
-                  <td className="cell-muted">{p.email ?? p.mobilePhone ?? "—"}</td>
+                  <td className="cell-primary">
+                    {p.displayName}
+                    {p.participantType === "guest" && (
+                      <span className="badge badge-neutral" style={{ marginLeft: 6 }}>
+                        Guest
+                      </span>
+                    )}
+                  </td>
+                  <td className="cell-muted">
+                    {p.participantType === "user" ? "BEACON Responder" : p.participantType === "contact" ? "Contact" : "Guest"}
+                  </td>
+                  <td className="cell-muted">
+                    {p.participantType === "guest"
+                      ? [p.guestCapabilities?.chat ? "Chat" : null, p.guestCapabilities?.warRoom ? "War Room" : null]
+                          .filter(Boolean)
+                          .join(", ") || "—"
+                      : (p.email ?? p.mobilePhone ?? "—")}
+                  </td>
                   <td>
-                    <span className={`badge ${p.sourceStatus === "active" ? "badge-success" : "badge-warning"}`}>
-                      {p.sourceStatus}
-                    </span>
+                    {p.participantType === "guest" ? (
+                      <span className={`badge ${p.guestVerifiedAt ? "badge-success" : "badge-warning"}`}>
+                        {p.guestVerifiedAt ? "Verified" : "Not yet verified"}
+                      </span>
+                    ) : (
+                      <span className={`badge ${p.sourceStatus === "active" ? "badge-success" : "badge-warning"}`}>
+                        {p.sourceStatus}
+                      </span>
+                    )}
                   </td>
                   {canManage && (
                     <td>

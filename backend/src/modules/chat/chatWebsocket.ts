@@ -3,8 +3,9 @@ import type WebSocket from "ws";
 import { getDb } from "@beacon/database";
 import { hasPermission } from "../rbac/permissions.js";
 import { findIncidentById } from "../incidents/incidentQueries.js";
-import { sendMessage } from "./chatService.js";
+import { sendMessage, sendGuestMessage } from "./chatService.js";
 import { AuthError } from "../auth/errors.js";
+import type { ChatMessageDto } from "./chatDto.js";
 
 /** `ws`'s numeric readyState constants — hardcoded to avoid a value import of the `ws` module in
  * a codebase that otherwise only needs its types (1 === WebSocket.OPEN). */
@@ -89,14 +90,79 @@ function isIncomingSendFrame(value: unknown): value is IncomingSendFrame {
   return Object.keys(record).every((key) => INCOMING_SEND_KEYS.has(key));
 }
 
+interface ChatActor {
+  /** Re-checked per message, not just at connection time — a caller with only read access may
+   * hold an open connection but must never be able to persist a message. */
+  canSend(): Promise<boolean>;
+  send(incidentId: string, body: string): Promise<ChatMessageDto>;
+}
+
+async function runConnection(socket: WebSocket, incidentId: string, actor: ChatActor): Promise<void> {
+  const db = getDb();
+  const incident = await findIncidentById(db, incidentId);
+  if (!incident) {
+    socket.close(4404, "incident_not_found");
+    return;
+  }
+
+  registerConnection(incidentId, socket);
+  safeSend(socket, { type: "connected", incidentId });
+
+  const sendTimestamps: number[] = [];
+
+  socket.on("message", (raw: Buffer) => {
+    void (async () => {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw.toString());
+      } catch {
+        safeSend(socket, { type: "error", error: "invalid_payload" });
+        return;
+      }
+
+      if (!isIncomingSendFrame(parsed)) {
+        safeSend(socket, { type: "error", error: "unknown_command" });
+        return;
+      }
+      const requestId = parsed.requestId;
+
+      const now = Date.now();
+      while (sendTimestamps.length > 0 && now - sendTimestamps[0]! > RATE_LIMIT_WINDOW_MS) {
+        sendTimestamps.shift();
+      }
+      if (sendTimestamps.length >= RATE_LIMIT_MAX_SENDS) {
+        safeSend(socket, { type: "error", error: "rate_limited", requestId });
+        return;
+      }
+
+      if (!(await actor.canSend())) {
+        safeSend(socket, { type: "error", error: "not_authorized", requestId });
+        return;
+      }
+
+      sendTimestamps.push(now);
+
+      try {
+        const message = await actor.send(incidentId, parsed.body);
+        safeSend(socket, { type: "sent", requestId, message });
+        broadcast(incidentId, { type: "message", message }, socket);
+      } catch (err) {
+        const safeMessage = err instanceof AuthError ? err.message : "Unable to send message.";
+        safeSend(socket, { type: "error", error: "send_failed", message: safeMessage, requestId });
+      }
+    })();
+  });
+
+  socket.on("close", () => {
+    unregisterConnection(incidentId, socket);
+  });
+}
+
 /**
  * `GET /ws/incidents/:id/chat` connection handler. Authentication and the `incidents.chat.read`
  * permission are already enforced by the route's normal `preHandler` chain (Fastify runs those
  * before the WebSocket upgrade completes — an unauthenticated or unauthorized request never
- * reaches this handler at all, and never gets upgraded). This handler only adds what the
- * preHandler chain cannot: confirming the Incident actually exists, and re-checking
- * `incidents.chat.send` per message (a caller with only read access may hold an open connection
- * but must never be able to persist a message). See
+ * reaches this handler at all, and never gets upgraded). See
  * claude/prompts/13-realtime-incident-chat.md, "WebSocket authentication" and "authorization".
  */
 export function createChatConnectionHandler() {
@@ -105,63 +171,29 @@ export function createChatConnectionHandler() {
     const userId = request.authUser!.id;
     const db = getDb();
 
-    const incident = await findIncidentById(db, incidentId);
-    if (!incident) {
-      socket.close(4404, "incident_not_found");
-      return;
-    }
-
-    registerConnection(incidentId, socket);
-    safeSend(socket, { type: "connected", incidentId });
-
-    const sendTimestamps: number[] = [];
-
-    socket.on("message", (raw: Buffer) => {
-      void (async () => {
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(raw.toString());
-        } catch {
-          safeSend(socket, { type: "error", error: "invalid_payload" });
-          return;
-        }
-
-        if (!isIncomingSendFrame(parsed)) {
-          safeSend(socket, { type: "error", error: "unknown_command" });
-          return;
-        }
-        const requestId = parsed.requestId;
-
-        const now = Date.now();
-        while (sendTimestamps.length > 0 && now - sendTimestamps[0]! > RATE_LIMIT_WINDOW_MS) {
-          sendTimestamps.shift();
-        }
-        if (sendTimestamps.length >= RATE_LIMIT_MAX_SENDS) {
-          safeSend(socket, { type: "error", error: "rate_limited", requestId });
-          return;
-        }
-
-        const canSend = await hasPermission(db, userId, "incidents.chat.send");
-        if (!canSend) {
-          safeSend(socket, { type: "error", error: "not_authorized", requestId });
-          return;
-        }
-
-        sendTimestamps.push(now);
-
-        try {
-          const message = await sendMessage(db, incidentId, userId, parsed.body);
-          safeSend(socket, { type: "sent", requestId, message });
-          broadcast(incidentId, { type: "message", message }, socket);
-        } catch (err) {
-          const safeMessage = err instanceof AuthError ? err.message : "Unable to send message.";
-          safeSend(socket, { type: "error", error: "send_failed", message: safeMessage, requestId });
-        }
-      })();
+    await runConnection(socket, incidentId, {
+      canSend: () => hasPermission(db, userId, "incidents.chat.send"),
+      send: (id, body) => sendMessage(db, id, userId, body),
     });
+  };
+}
 
-    socket.on("close", () => {
-      unregisterConnection(incidentId, socket);
+/**
+ * Module 19 — `GET /ws/guest/incidents/:id/chat`. The route's own `preHandler` chain
+ * (`authenticateGuest` + `requireGuestIncidentMatch` + `requireGuestCapability("chat")`) already
+ * guarantees a valid Guest session scoped to exactly this Incident with chat granted before the
+ * upgrade completes — mirrored here only for defense in depth (`canSend` re-checks the capability
+ * per message, exactly like the registered-User handler re-checks `incidents.chat.send`).
+ */
+export function createGuestChatConnectionHandler() {
+  return async function handleGuestChatConnection(socket: WebSocket, request: FastifyRequest): Promise<void> {
+    const { id: incidentId } = request.params as { id: string };
+    const guest = request.authGuest!;
+    const db = getDb();
+
+    await runConnection(socket, incidentId, {
+      canSend: () => Promise.resolve(guest.capabilities.chat === true && !!guest.participantId),
+      send: (id, body) => sendGuestMessage(db, id, guest.participantId!, body),
     });
   };
 }

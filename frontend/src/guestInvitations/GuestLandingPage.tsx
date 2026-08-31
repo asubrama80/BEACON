@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { getPublicInvitation } from "./api";
 import type { PublicInvitation } from "./types";
 import { requestGuestOtp, verifyGuestOtp, getGuestSession, guestLogout, type GuestSessionInfo } from "../guestVerification/api";
+import GuestChatPanel from "../guestVerification/GuestChatPanel";
+import GuestWarRoomPanel from "../guestVerification/GuestWarRoomPanel";
 
 const REASON_MESSAGE: Record<string, string> = {
   expired: "This invitation link has expired.",
@@ -93,9 +95,16 @@ export default function GuestLandingPage({ token }: GuestLandingPageProps): JSX.
     setBusy(true);
     setError(null);
     try {
-      const result = await verifyGuestOtp(token, code);
-      setSession({ guestName: result.guestName, incidentId: result.incidentId, capabilities: { chat: false, warRoom: false } });
-      setPhase("verified");
+      await verifyGuestOtp(token, code);
+      // The verify response doesn't carry capabilities — the session cookie is now set, so fetch
+      // the authoritative context the same way a page refresh would.
+      const info = await getGuestSession();
+      if (info) {
+        setSession(info);
+        setPhase("verified");
+      } else {
+        setError("Verification succeeded, but the session could not be confirmed. Please try again.");
+      }
     } catch (err) {
       const errCode = (err as { code?: string }).code;
       if (errCode && TERMINAL_ERROR_CODES.has(errCode)) {
@@ -121,7 +130,7 @@ export default function GuestLandingPage({ token }: GuestLandingPageProps): JSX.
 
   return (
     <div className="app-shell-loading" style={{ flexDirection: "column", gap: 16 }}>
-      <div className="card" style={{ maxWidth: 420, padding: 24, textAlign: "center" }}>
+      <div className="card" style={{ maxWidth: phase === "verified" ? 520 : 420, padding: 24, textAlign: "center" }}>
         <h1 style={{ fontSize: 20, marginBottom: 8 }}>BEACON Guest {phase === "verified" ? "Portal" : "Invitation"}</h1>
 
         {phase === "loading" && <p className="cell-muted">Loading…</p>}
@@ -190,9 +199,15 @@ export default function GuestLandingPage({ token }: GuestLandingPageProps): JSX.
           <>
             <p className="cell-primary">Welcome, {session.guestName}.</p>
             <p className="cell-muted">You are verified for this incident.</p>
-            <p className="cell-muted" style={{ marginTop: 8, fontSize: 12 }}>
-              The full Guest incident portal (chat, War Room) is not available yet in this build.
-            </p>
+
+            {session.capabilities.chat && <GuestChatPanel incidentId={session.incidentId} />}
+            {session.capabilities.warRoom && <GuestWarRoomPanel incidentId={session.incidentId} />}
+            {!session.capabilities.chat && !session.capabilities.warRoom && (
+              <p className="cell-muted" style={{ marginTop: 8, fontSize: 12 }}>
+                No additional incident access has been granted for this invitation.
+              </p>
+            )}
+
             <div className="detail-actions" style={{ justifyContent: "center", marginTop: 16 }}>
               <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => void handleLogout()}>
                 Log out

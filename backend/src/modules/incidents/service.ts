@@ -15,13 +15,16 @@ import {
 import {
   findActiveParticipantByUser,
   findActiveParticipantByContact,
+  findActiveParticipantByGuestInvitation,
   insertUserParticipant,
   insertContactParticipant,
+  insertGuestParticipant,
   findParticipantRowById,
   softRemoveParticipant,
   listParticipants as queryParticipants,
   normalizePagination as normalizeParticipantPagination,
 } from "./participantQueries.js";
+import { revokeAllGuestSessionsForInvitation } from "../guestVerification/guestVerificationQueries.js";
 import { appendTimelineEvent, listTimeline as queryTimeline, normalizePagination as normalizeTimelinePagination } from "./timelineQueries.js";
 import {
   toIncidentDto,
@@ -518,7 +521,12 @@ export async function addContactParticipant(
   });
 }
 
-/** Soft removal (status → 'removed') — never a hard delete. See module doc, "Participant model". */
+/**
+ * Soft removal (status → 'removed') — never a hard delete. See module doc, "Participant model".
+ * For a Guest participant (Module 19), also eagerly revokes every active Guest session for the
+ * underlying invitation in the same transaction — see
+ * claude/prompts/19-participant-management.md, "Removal revokes access".
+ */
 export async function removeParticipant(
   db: Database,
   incidentId: string,
@@ -535,6 +543,18 @@ export async function removeParticipant(
 
     await softRemoveParticipant(tx, participantId);
 
+    if (participant.participantType === "guest" && participant.guestInvitationId) {
+      await revokeAllGuestSessionsForInvitation(tx, participant.guestInvitationId);
+      await recordAuthEvent(tx, {
+        eventType: "GUEST_ACCESS_REVOKED",
+        actorId,
+        resourceType: "guest_invitation",
+        resourceId: participant.guestInvitationId,
+        incidentId,
+        metadata: { reason: "participant_removed" },
+      });
+    }
+
     await appendTimelineEvent(tx, {
       incidentId,
       eventType: "PARTICIPANT_REMOVED",
@@ -550,6 +570,20 @@ export async function removeParticipant(
       metadata: { participantId },
     });
   });
+}
+
+/**
+ * Module 19 — auto-enrolls a just-verified Guest into the Incident roster. Called from
+ * `guestVerificationService.verifyOtp()` inside the SAME transaction as `markInvitationVerified()`,
+ * gated on that function's own first-time-only return value — so this is only ever reached once
+ * per invitation, on the winning side of a concurrent-verification race. The
+ * `incident_participants_active_guest_idx` partial unique index is the real duplicate guarantee;
+ * the pre-check here only avoids an unnecessary insert attempt.
+ */
+export async function enrollVerifiedGuestParticipant(tx: DbOrTx, incidentId: string, guestInvitationId: string): Promise<void> {
+  const existing = await findActiveParticipantByGuestInvitation(tx, incidentId, guestInvitationId);
+  if (existing) return;
+  await insertGuestParticipant(tx, incidentId, guestInvitationId);
 }
 
 export interface ListTimelineOptions {

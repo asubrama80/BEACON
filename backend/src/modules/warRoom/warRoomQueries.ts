@@ -1,6 +1,6 @@
 import { alias } from "drizzle-orm/pg-core";
 import { and, desc, eq, sql } from "drizzle-orm";
-import { incidentWarRooms, warRoomSessions, users, type Database, type DbOrTx } from "@beacon/database";
+import { incidentWarRooms, warRoomSessions, users, guestInvitations, type Database, type DbOrTx } from "@beacon/database";
 import type { WarRoomRow, WarRoomSessionRow } from "./warRoomDto.js";
 
 const openedByUsers = alias(users, "opened_by_users");
@@ -82,6 +82,26 @@ export async function insertSession(db: DbOrTx, warRoomId: string, userId: strin
   return row;
 }
 
+/** Module 19 — the Guest equivalent of `findActiveSession()`/`insertSession()` above, keyed by
+ * `guestInvitationId` rather than `userId`. */
+export async function findActiveGuestSession(db: DbOrTx, warRoomId: string, guestInvitationId: string): Promise<{ id: string } | undefined> {
+  const [row] = await db
+    .select({ id: warRoomSessions.id })
+    .from(warRoomSessions)
+    .where(and(eq(warRoomSessions.warRoomId, warRoomId), eq(warRoomSessions.guestInvitationId, guestInvitationId), eq(warRoomSessions.status, "joined")))
+    .limit(1);
+  return row;
+}
+
+export async function insertGuestWarRoomSession(db: DbOrTx, warRoomId: string, guestInvitationId: string): Promise<{ id: string }> {
+  const [row] = await db
+    .insert(warRoomSessions)
+    .values({ warRoomId, participantType: "guest", guestInvitationId, status: "joined" })
+    .returning({ id: warRoomSessions.id });
+  if (!row) throw new Error("Failed to create a Guest War Room session.");
+  return row;
+}
+
 /** Idempotent — zero affected rows if the session was already left (or never existed). */
 export async function endSession(db: DbOrTx, sessionId: string): Promise<void> {
   await db
@@ -102,14 +122,18 @@ export async function listSessions(db: Database, warRoomId: string): Promise<War
   return db
     .select({
       id: warRoomSessions.id,
+      participantType: warRoomSessions.participantType,
       userId: warRoomSessions.userId,
+      guestInvitationId: warRoomSessions.guestInvitationId,
       displayName: users.displayName,
+      guestName: guestInvitations.guestName,
       status: warRoomSessions.status,
       joinedAt: warRoomSessions.joinedAt,
       leftAt: warRoomSessions.leftAt,
     })
     .from(warRoomSessions)
     .leftJoin(users, eq(users.id, warRoomSessions.userId))
+    .leftJoin(guestInvitations, eq(guestInvitations.id, warRoomSessions.guestInvitationId))
     .where(eq(warRoomSessions.warRoomId, warRoomId))
     .orderBy(desc(warRoomSessions.joinedAt));
 }

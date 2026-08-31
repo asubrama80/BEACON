@@ -130,7 +130,13 @@ export default function ChatPanel({ incidentId, canRead, canSend, isClosed, curr
           return (
             <div key={message.id} style={{ marginBottom: 10, textAlign: isMe ? "right" : "left" }}>
               <div className="cell-muted" style={{ fontSize: 12, marginBottom: 2 }}>
-                {message.authorDisplayName} · {new Date(message.createdAt).toLocaleTimeString()}
+                {message.authorDisplayName}
+                {message.isGuest && (
+                  <span className="badge badge-neutral" style={{ marginLeft: 4, fontSize: 10 }}>
+                    Guest
+                  </span>
+                )}{" "}
+                · {new Date(message.createdAt).toLocaleTimeString()}
               </div>
               <div
                 style={{

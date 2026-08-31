@@ -60,7 +60,8 @@ export type AuthAuditEventType =
   | "GUEST_OTP_REQUESTED"
   | "GUEST_VERIFICATION_SUCCEEDED"
   | "GUEST_VERIFICATION_FAILED_LIMIT"
-  | "GUEST_SESSION_REVOKED";
+  | "GUEST_SESSION_REVOKED"
+  | "GUEST_ACCESS_REVOKED";
 
 export interface RecordAuthEventInput {
   eventType: AuthAuditEventType;

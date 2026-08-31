@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { listMessages, chatSocketUrl } from "./api";
-import type { ChatConnectionState, ChatMessage } from "./types";
+import { listMessages as listUserMessages, chatSocketUrl as userChatSocketUrl } from "./api";
+import type { ChatConnectionState, ChatMessage, ChatMessagesResponse } from "./types";
 
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 15000;
@@ -15,6 +15,11 @@ interface UseChatSocketOptions {
   incidentId: string;
   /** Only connects while true — e.g. the Chat tab is open and the caller has read access. */
   enabled: boolean;
+  /** Defaults to the registered-User REST/WS endpoints — the Guest portal passes its own
+   * (`guest/incidents/:id/chat/...`) so this hook's connect/reconnect/backoff logic is shared
+   * rather than duplicated. See claude/prompts/19-participant-management.md, "Guest chat". */
+  listMessages?: (incidentId: string, params: { before?: number; limit?: number }) => Promise<ChatMessagesResponse>;
+  socketUrl?: (incidentId: string) => string;
 }
 
 export interface UseChatSocketResult {
@@ -33,7 +38,12 @@ export interface UseChatSocketResult {
  * rather than ever relying on the socket to replay missed messages. See
  * claude/prompts/13-realtime-incident-chat.md, "Reconnect".
  */
-export function useChatSocket({ incidentId, enabled }: UseChatSocketOptions): UseChatSocketResult {
+export function useChatSocket({
+  incidentId,
+  enabled,
+  listMessages = listUserMessages,
+  socketUrl = userChatSocketUrl,
+}: UseChatSocketOptions): UseChatSocketResult {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [hasMoreOlder, setHasMoreOlder] = useState(false);
   const [connectionState, setConnectionState] = useState<ChatConnectionState>("connecting");
@@ -64,7 +74,7 @@ export function useChatSocket({ incidentId, enabled }: UseChatSocketOptions): Us
       }
       if (cancelled) return;
 
-      const ws = new WebSocket(chatSocketUrl(incidentId));
+      const ws = new WebSocket(socketUrl(incidentId));
       socketRef.current = ws;
 
       ws.onopen = () => {
@@ -133,7 +143,7 @@ export function useChatSocket({ incidentId, enabled }: UseChatSocketOptions): Us
       socketRef.current?.close();
       socketRef.current = null;
     };
-  }, [incidentId, enabled]);
+  }, [incidentId, enabled, listMessages, socketUrl]);
 
   function send(body: string): Promise<void> {
     return new Promise((resolve, reject) => {

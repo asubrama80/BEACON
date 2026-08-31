@@ -2,9 +2,11 @@ export interface ChatMessage {
   id: string;
   incidentId: string;
   seq: number;
-  authorType: "user";
-  authorUserId: string;
+  authorType: "user" | "guest";
+  authorUserId: string | null;
+  authorParticipantId: string | null;
   authorDisplayName: string;
+  isGuest: boolean;
   messageText: string;
   createdAt: string;
 }

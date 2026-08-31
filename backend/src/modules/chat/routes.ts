@@ -4,11 +4,14 @@ import type { AuthConfig } from "../auth/config.js";
 import { createAuthenticateHook } from "../auth/plugin.js";
 import { requirePermission } from "../rbac/guard.js";
 import { NOT_AUTHORIZED } from "../auth/errors.js";
-import { createChatConnectionHandler } from "./chatWebsocket.js";
+import type { GuestVerificationConfig } from "../guestVerification/config.js";
+import { createAuthenticateGuestHook, requireGuestCapability, requireGuestIncidentMatch } from "../guestVerification/guestAuth.js";
+import { createChatConnectionHandler, createGuestChatConnectionHandler } from "./chatWebsocket.js";
 import { listMessages } from "./chatService.js";
 
 interface ChatRoutesOptions {
   config: AuthConfig;
+  guestVerificationConfig: GuestVerificationConfig;
   /** The single allowed browser origin — reused from the app's own CORS config (Module 13 has no
    * separate origin setting; WebSocket upgrades are validated against the same value). */
   corsOrigin: string;
@@ -31,9 +34,11 @@ const historyQuerySchema = {
 } as const;
 
 export async function chatRoutes(app: FastifyInstance, opts: ChatRoutesOptions): Promise<void> {
-  const { config, corsOrigin } = opts;
+  const { config, guestVerificationConfig, corsOrigin } = opts;
   const authenticate = createAuthenticateHook(config);
   const canRead = requirePermission("incidents.chat.read");
+  const authenticateGuest = createAuthenticateGuestHook(guestVerificationConfig);
+  const canGuestChat = requireGuestCapability("chat");
 
   /**
    * Validates the WebSocket handshake's Origin header against the single configured allowed
@@ -65,6 +70,34 @@ export async function chatRoutes(app: FastifyInstance, opts: ChatRoutesOptions):
   app.get(
     "/incidents/:id/chat/messages",
     { preHandler: [authenticate, canRead], schema: { params: idParamSchema, querystring: historyQuerySchema } },
+    async (request) => {
+      const { id } = request.params as { id: string };
+      const query = request.query as { before?: number; limit?: number };
+      return listMessages(getDb(), id, { beforeSeq: query.before, limit: query.limit });
+    },
+  );
+
+  /**
+   * Module 19 — Guest-facing chat. `requireGuestIncidentMatch` (before `canGuestChat`) rejects any
+   * attempt to open a connection or send against an Incident other than the one the Guest's own
+   * invitation belongs to — the frontend can never widen a Guest's scope by supplying a different
+   * `:id`. History reads only require a valid Guest session scoped to this Incident (not the chat
+   * capability specifically) — a Guest denied `chat` can still see why they can't participate, the
+   * same way a registered read-only User can.
+   */
+  app.get(
+    "/ws/guest/incidents/:id/chat",
+    {
+      websocket: true,
+      preHandler: [verifyOrigin, authenticateGuest, requireGuestIncidentMatch, canGuestChat],
+      schema: { params: idParamSchema },
+    },
+    createGuestChatConnectionHandler(),
+  );
+
+  app.get(
+    "/guest/incidents/:id/chat/messages",
+    { preHandler: [authenticateGuest, requireGuestIncidentMatch], schema: { params: idParamSchema, querystring: historyQuerySchema } },
     async (request) => {
       const { id } = request.params as { id: string };
       const query = request.query as { before?: number; limit?: number };

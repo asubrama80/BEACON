@@ -136,6 +136,21 @@ export async function revokeGuestSession(db: DbOrTx, id: string): Promise<void> 
   await db.update(guestSessions).set({ revokedAt: new Date() }).where(eq(guestSessions.id, id));
 }
 
+/**
+ * Module 19 — revokes every currently-active session for an invitation in one call, used when a
+ * manager removes a Guest from the participant roster (see `incidents/service.ts`'s
+ * `removeParticipant()`). This is the actual mechanism that makes removal immediate:
+ * `authenticateGuest()` looks up the session by its (unchanged) cookie token, and a revoked
+ * session row simply no longer matches `findActiveGuestSessionByTokenHash()`'s `revoked_at IS
+ * NULL` condition — no separate participant-status check is needed there.
+ */
+export async function revokeAllGuestSessionsForInvitation(db: DbOrTx, invitationId: string): Promise<void> {
+  await db
+    .update(guestSessions)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(guestSessions.invitationId, invitationId), isNull(guestSessions.revokedAt)));
+}
+
 export async function touchGuestSession(db: DbOrTx, id: string, now: Date): Promise<void> {
   await db.update(guestSessions).set({ lastSeenAt: now }).where(eq(guestSessions.id, id));
 }

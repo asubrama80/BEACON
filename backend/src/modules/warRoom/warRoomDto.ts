@@ -36,11 +36,14 @@ export function toWarRoomDto(row: WarRoomRow | undefined, activeSessionCount: nu
   };
 }
 
-/** A session never carries any media/provider state — see module doc, "No fake media state". */
+/** A session never carries any media/provider state — see module doc, "No fake media state".
+ * `participantType` distinguishes a registered User from a verified Guest (Module 19). */
 export interface WarRoomSessionDto {
   id: string;
+  participantType: "user" | "guest";
   userId: string | null;
   displayName: string;
+  isGuest: boolean;
   status: "joined" | "left";
   joinedAt: string;
   leftAt: string | null;
@@ -48,18 +51,24 @@ export interface WarRoomSessionDto {
 
 export interface WarRoomSessionRow {
   id: string;
+  participantType: string;
   userId: string | null;
+  guestInvitationId: string | null;
   displayName: string | null;
+  guestName: string | null;
   status: string;
   joinedAt: Date;
   leftAt: Date | null;
 }
 
 export function toWarRoomSessionDto(row: WarRoomSessionRow): WarRoomSessionDto {
+  const isGuest = row.participantType === "guest";
   return {
     id: row.id,
-    userId: row.userId,
-    displayName: row.displayName ?? "Unknown",
+    participantType: isGuest ? "guest" : "user",
+    userId: isGuest ? null : row.userId,
+    displayName: (isGuest ? row.guestName : row.displayName) ?? "Unknown",
+    isGuest,
     status: row.status as "joined" | "left",
     joinedAt: row.joinedAt.toISOString(),
     leftAt: row.leftAt ? row.leftAt.toISOString() : null,

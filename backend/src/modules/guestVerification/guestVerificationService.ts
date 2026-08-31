@@ -5,6 +5,7 @@ import { appendTimelineEvent } from "../incidents/timelineQueries.js";
 import { hashInvitationToken } from "../guestInvitations/token.js";
 import { findPublicInvitationByTokenHash, markInvitationVerified, type PublicLookupRow } from "../guestInvitations/guestInvitationQueries.js";
 import { maskDestination } from "../guestInvitations/maskDestination.js";
+import { enrollVerifiedGuestParticipant } from "../incidents/service.js";
 import type { NotificationConfig } from "../notifications/config.js";
 import type { GuestVerificationConfig } from "./config.js";
 import { generateOtp, generateOtpSalt, hashOtp, verifyOtp as checkOtp } from "./otp.js";
@@ -160,6 +161,13 @@ export async function verifyOtp(
 
     if (firstTimeVerified) {
       await appendTimelineEvent(tx, { incidentId: lookup.incidentId, eventType: "GUEST_VERIFIED" });
+      // Module 19 — the invitation itself already represents explicit participation
+      // authorization, so first-time verification auto-enrolls the Guest onto the roster. Gated
+      // on `firstTimeVerified` for the same reason as the timeline event above: a later
+      // re-authentication (session expired, guest logs back in) must never resurrect a
+      // participant a manager has since removed. See
+      // claude/prompts/19-participant-management.md, "Auto-enrollment".
+      await enrollVerifiedGuestParticipant(tx, lookup.incidentId, lookup.id);
     }
   });
 

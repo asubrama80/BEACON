@@ -1,5 +1,5 @@
 import { and, desc, eq, lt } from "drizzle-orm";
-import { chatMessages, users, type Database, type DbOrTx } from "@beacon/database";
+import { chatMessages, users, incidentParticipants, guestInvitations, type Database, type DbOrTx } from "@beacon/database";
 import type { ChatMessageRow } from "./chatDto.js";
 
 const MESSAGE_COLUMNS = {
@@ -8,22 +8,26 @@ const MESSAGE_COLUMNS = {
   seq: chatMessages.seq,
   authorType: chatMessages.authorType,
   userId: chatMessages.userId,
+  participantId: chatMessages.participantId,
   authorDisplayName: users.displayName,
+  guestName: guestInvitations.guestName,
   messageText: chatMessages.messageText,
   createdAt: chatMessages.createdAt,
 } as const;
 
-export interface InsertMessageInput {
-  incidentId: string;
-  userId: string;
-  messageText: string;
-}
+export type InsertMessageInput =
+  | { incidentId: string; authorType: "user"; userId: string; messageText: string }
+  | { incidentId: string; authorType: "guest"; participantId: string; messageText: string };
 
 /** Server-generated id/seq/createdAt — never accepted from the client. */
 export async function insertMessage(db: DbOrTx, input: InsertMessageInput): Promise<{ id: string }> {
   const [row] = await db
     .insert(chatMessages)
-    .values({ incidentId: input.incidentId, authorType: "user", userId: input.userId, messageText: input.messageText })
+    .values(
+      input.authorType === "user"
+        ? { incidentId: input.incidentId, authorType: "user", userId: input.userId, messageText: input.messageText }
+        : { incidentId: input.incidentId, authorType: "guest", participantId: input.participantId, messageText: input.messageText },
+    )
     .returning({ id: chatMessages.id });
   if (!row) {
     throw new Error("Failed to insert chat message.");
@@ -36,6 +40,8 @@ export async function findMessageById(db: DbOrTx, id: string): Promise<ChatMessa
     .select(MESSAGE_COLUMNS)
     .from(chatMessages)
     .leftJoin(users, eq(users.id, chatMessages.userId))
+    .leftJoin(incidentParticipants, eq(incidentParticipants.id, chatMessages.participantId))
+    .leftJoin(guestInvitations, eq(guestInvitations.id, incidentParticipants.guestInvitationId))
     .where(eq(chatMessages.id, id))
     .limit(1);
   return row;
@@ -71,6 +77,8 @@ export async function listMessages(db: Database, incidentId: string, filter: Lis
     .select(MESSAGE_COLUMNS)
     .from(chatMessages)
     .leftJoin(users, eq(users.id, chatMessages.userId))
+    .leftJoin(incidentParticipants, eq(incidentParticipants.id, chatMessages.participantId))
+    .leftJoin(guestInvitations, eq(guestInvitations.id, incidentParticipants.guestInvitationId))
     .where(and(...conditions))
     .orderBy(desc(chatMessages.seq))
     .limit(filter.limit);

@@ -14,6 +14,8 @@ import {
   endSession,
   endAllActiveSessions,
   listSessions as queryListSessions,
+  findActiveGuestSession,
+  insertGuestWarRoomSession,
 } from "./warRoomQueries.js";
 import { toWarRoomDto, toWarRoomSessionDto, type WarRoomDto, type WarRoomSessionDto } from "./warRoomDto.js";
 
@@ -131,6 +133,46 @@ export async function leaveWarRoom(db: Database, incidentId: string, userId: str
   const active = await findActiveWarRoom(db, incidentId);
   if (active) {
     const existingSession = await findActiveSession(db, active.id, userId);
+    if (existingSession) {
+      await endSession(db, existingSession.id);
+    }
+  }
+  return getWarRoom(db, incidentId);
+}
+
+/**
+ * Module 19 — the Guest equivalent of `joinWarRoom()`. Capability gating (`capabilities.warRoom
+ * === true`) and Incident-scope isolation are the caller's responsibility
+ * (`requireGuestCapability("warRoom")` + `requireGuestIncidentMatch` on the route), not
+ * re-checked here — mirrors `joinWarRoom()` leaving `incidents.war_room.join` to its own route.
+ * Idempotent for the same reason: a second Join by an already-active Guest returns their existing
+ * session (the partial unique index `war_room_sessions_active_guest_idx` is the actual
+ * duplicate-session guarantee, not this pre-check alone).
+ */
+export async function joinWarRoomAsGuest(db: Database, incidentId: string, guestInvitationId: string): Promise<WarRoomDto> {
+  const incident = await assertIncidentExists(db, incidentId);
+  if (incident.status === "closed") {
+    throw new AuthError(409, "incident_closed", "This Incident is closed; its War Room can no longer be joined.");
+  }
+  const active = await findActiveWarRoom(db, incidentId);
+  if (!active) {
+    throw new AuthError(409, "war_room_not_open", "This Incident has no open War Room to join.");
+  }
+
+  const existingSession = await findActiveGuestSession(db, active.id, guestInvitationId);
+  if (!existingSession) {
+    await insertGuestWarRoomSession(db, active.id, guestInvitationId);
+  }
+
+  return getWarRoom(db, incidentId);
+}
+
+/** Idempotent — same tolerance for a redundant/late call as `leaveWarRoom()`. */
+export async function leaveWarRoomAsGuest(db: Database, incidentId: string, guestInvitationId: string): Promise<WarRoomDto> {
+  await assertIncidentExists(db, incidentId);
+  const active = await findActiveWarRoom(db, incidentId);
+  if (active) {
+    const existingSession = await findActiveGuestSession(db, active.id, guestInvitationId);
     if (existingSession) {
       await endSession(db, existingSession.id);
     }

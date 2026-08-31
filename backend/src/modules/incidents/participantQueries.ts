@@ -1,5 +1,5 @@
 import { and, eq, ne, sql } from "drizzle-orm";
-import { incidentParticipants, users, contacts, type Database, type DbOrTx } from "@beacon/database";
+import { incidentParticipants, users, contacts, guestInvitations, type Database, type DbOrTx } from "@beacon/database";
 import type { ParticipantRow } from "./dto.js";
 
 const PARTICIPANT_COLUMNS = {
@@ -9,6 +9,7 @@ const PARTICIPANT_COLUMNS = {
   status: incidentParticipants.status,
   userId: incidentParticipants.userId,
   contactId: incidentParticipants.contactId,
+  guestInvitationId: incidentParticipants.guestInvitationId,
   userDisplayName: users.displayName,
   userStatus: users.status,
   contactFirstName: contacts.firstName,
@@ -16,6 +17,10 @@ const PARTICIPANT_COLUMNS = {
   contactEmail: contacts.email,
   contactMobilePhone: contacts.mobilePhone,
   contactStatus: contacts.status,
+  guestName: guestInvitations.guestName,
+  guestInvitationStatus: guestInvitations.status,
+  guestPermissions: guestInvitations.permissions,
+  guestVerifiedAt: guestInvitations.verifiedAt,
   createdAt: incidentParticipants.createdAt,
 } as const;
 
@@ -89,13 +94,54 @@ export async function insertContactParticipant(
   return row;
 }
 
+/**
+ * Module 19 — the auto-enrollment insert for a just-verified Guest. Race-safety comes from
+ * `incident_participants_active_guest_idx` (the same partial-unique-index pattern as the User/
+ * Contact variants), not this function alone; the caller (`guestVerificationService.verifyOtp()`)
+ * only ever reaches this once per invitation because it's gated on `markInvitationVerified()`'s
+ * own idempotent first-time-only return value. See claude/prompts/19-participant-management.md,
+ * "Auto-enrollment".
+ */
+export async function insertGuestParticipant(tx: DbOrTx, incidentId: string, guestInvitationId: string): Promise<{ id: string }> {
+  const [row] = await tx
+    .insert(incidentParticipants)
+    .values({ incidentId, participantType: "guest", guestInvitationId, status: "joined" })
+    .returning({ id: incidentParticipants.id });
+  if (!row) throw new Error("Participant insert failed unexpectedly.");
+  return row;
+}
+
+export async function findActiveParticipantByGuestInvitation(
+  tx: DbOrTx,
+  incidentId: string,
+  guestInvitationId: string,
+): Promise<{ id: string } | undefined> {
+  const [row] = await tx
+    .select({ id: incidentParticipants.id })
+    .from(incidentParticipants)
+    .where(
+      and(
+        eq(incidentParticipants.incidentId, incidentId),
+        eq(incidentParticipants.guestInvitationId, guestInvitationId),
+        ne(incidentParticipants.status, "removed"),
+      ),
+    )
+    .limit(1);
+  return row;
+}
+
 export async function findParticipantRowById(
   tx: DbOrTx,
   incidentId: string,
   participantId: string,
-): Promise<{ id: string; status: string } | undefined> {
+): Promise<{ id: string; status: string; participantType: string; guestInvitationId: string | null } | undefined> {
   const [row] = await tx
-    .select({ id: incidentParticipants.id, status: incidentParticipants.status })
+    .select({
+      id: incidentParticipants.id,
+      status: incidentParticipants.status,
+      participantType: incidentParticipants.participantType,
+      guestInvitationId: incidentParticipants.guestInvitationId,
+    })
     .from(incidentParticipants)
     .where(and(eq(incidentParticipants.incidentId, incidentId), eq(incidentParticipants.id, participantId)))
     .limit(1);
@@ -129,6 +175,7 @@ export async function listParticipants(
     .from(incidentParticipants)
     .leftJoin(users, eq(users.id, incidentParticipants.userId))
     .leftJoin(contacts, eq(contacts.id, incidentParticipants.contactId))
+    .leftJoin(guestInvitations, eq(guestInvitations.id, incidentParticipants.guestInvitationId))
     .where(whereClause)
     .orderBy(incidentParticipants.createdAt)
     .limit(filter.pageSize)

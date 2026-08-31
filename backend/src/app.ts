@@ -101,8 +101,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // Isolated from the rest of the application — no session auth/CSRF, provider-signature
   // authenticity instead. See claude/prompts/11-delivery-tracking.md, "Webhook routes".
   app.register((instance) => webhooksRoutes(instance, { notificationConfig, ...(options.sesFetchCert ? { sesFetchCert: options.sesFetchCert } : {}) }));
-  app.register((instance) => chatRoutes(instance, { config: authConfig, corsOrigin: env.corsOrigin }));
-  app.register((instance) => warRoomRoutes(instance, { config: authConfig }));
+  app.register((instance) => chatRoutes(instance, { config: authConfig, guestVerificationConfig, corsOrigin: env.corsOrigin }));
+  app.register((instance) => warRoomRoutes(instance, { config: authConfig, guestVerificationConfig }));
   app.register((instance) => guestInvitationRoutes(instance, { config: authConfig, guestInvitationConfig, notificationConfig }));
   app.register((instance) => guestInvitationPublicRoutes(instance));
   app.register((instance) =>

@@ -22,6 +22,10 @@ export interface AuthenticatedGuest {
   incidentId: string;
   guestName: string;
   capabilities: GuestVerificationCapabilities;
+  /** Module 19 — the roster row id, needed to author Chat messages / War Room sessions. `null`
+   * only in the narrow window between OTP verification and the same transaction's auto-enrollment
+   * insert — practically unreachable outside a test, since both happen in one transaction. */
+  participantId: string | null;
 }
 
 export interface GuestSessionInfo {

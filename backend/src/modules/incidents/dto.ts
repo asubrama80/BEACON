@@ -1,6 +1,6 @@
 export type IncidentSeverity = "info" | "warning" | "high" | "critical";
 export type IncidentStatus = "open" | "active" | "resolved" | "closed";
-export type ParticipantType = "user" | "contact";
+export type ParticipantType = "user" | "contact" | "guest";
 
 export interface CommanderSummaryDto {
   id: string;
@@ -70,7 +70,8 @@ export function toIncidentDto(row: IncidentRow): IncidentDto {
   };
 }
 
-/** A single Incident roster entry — either a registered User or a Contact, never both. */
+/** A single Incident roster entry — a registered User, a Contact, or a verified Guest, never more
+ * than one identity per row. See claude/prompts/19-participant-management.md, "Unified roster". */
 export interface ParticipantDto {
   id: string;
   participantType: ParticipantType;
@@ -79,8 +80,14 @@ export interface ParticipantDto {
   displayName: string;
   email: string | null;
   mobilePhone: string | null;
-  /** The underlying User/Contact's own current status (active/inactive/…) — never hidden. */
-  sourceStatus: string;
+  /** The underlying User/Contact's own current status (active/inactive/…) — never hidden. `null`
+   * for a Guest, which has no separate identity-level status beyond its own participant row. */
+  sourceStatus: string | null;
+  /** Guest-only — the invitation's granted capabilities. `null` for User/Contact rows. */
+  guestCapabilities: { chat: boolean; warRoom: boolean } | null;
+  /** Guest-only — when OTP verification completed. `null` for User/Contact rows, and for a Guest
+   * participant row that (in principle) exists before verification. */
+  guestVerifiedAt: string | null;
   addedAt: string;
 }
 
@@ -91,6 +98,7 @@ export interface ParticipantRow {
   status: string;
   userId: string | null;
   contactId: string | null;
+  guestInvitationId: string | null;
   userDisplayName: string | null;
   userStatus: string | null;
   contactFirstName: string | null;
@@ -98,7 +106,16 @@ export interface ParticipantRow {
   contactEmail: string | null;
   contactMobilePhone: string | null;
   contactStatus: string | null;
+  guestName: string | null;
+  guestInvitationStatus: string | null;
+  guestPermissions: unknown;
+  guestVerifiedAt: Date | null;
   createdAt: Date;
+}
+
+function toGuestCapabilities(raw: unknown): { chat: boolean; warRoom: boolean } {
+  const value = (raw ?? {}) as Record<string, unknown>;
+  return { chat: value.chat === true, warRoom: value.warRoom === true };
 }
 
 export function toParticipantDto(row: ParticipantRow): ParticipantDto {
@@ -112,6 +129,26 @@ export function toParticipantDto(row: ParticipantRow): ParticipantDto {
       email: null,
       mobilePhone: null,
       sourceStatus: row.userStatus ?? "active",
+      guestCapabilities: null,
+      guestVerifiedAt: null,
+      addedAt: row.createdAt.toISOString(),
+    };
+  }
+  if (row.participantType === "guest") {
+    return {
+      id: row.id,
+      participantType: "guest",
+      participantRole: row.participantRole,
+      status: row.status,
+      // Deliberately the Guest's display name only — never their invitation destination
+      // (email/phone), which ordinary roster viewers must never see. See
+      // claude/prompts/19-participant-management.md, "Roster privacy".
+      displayName: row.guestName ?? "",
+      email: null,
+      mobilePhone: null,
+      sourceStatus: null,
+      guestCapabilities: toGuestCapabilities(row.guestPermissions),
+      guestVerifiedAt: row.guestVerifiedAt ? row.guestVerifiedAt.toISOString() : null,
       addedAt: row.createdAt.toISOString(),
     };
   }
@@ -124,6 +161,8 @@ export function toParticipantDto(row: ParticipantRow): ParticipantDto {
     email: row.contactEmail,
     mobilePhone: row.contactMobilePhone,
     sourceStatus: row.contactStatus ?? "active",
+    guestCapabilities: null,
+    guestVerifiedAt: null,
     addedAt: row.createdAt.toISOString(),
   };
 }

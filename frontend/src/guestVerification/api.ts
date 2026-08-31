@@ -81,3 +81,64 @@ export async function getGuestSession(): Promise<GuestSessionInfo | null> {
 export async function guestLogout(): Promise<void> {
   await guestApiFetch("/guest/session/logout", { method: "POST" });
 }
+
+// ---------------------------------------------------------------------------------------------
+// Module 19 — Guest Chat and War Room, reusing the same cookie/CSRF pattern as everything above.
+
+export interface GuestChatMessage {
+  id: string;
+  incidentId: string;
+  seq: number;
+  authorType: "user" | "guest";
+  authorUserId: string | null;
+  authorParticipantId: string | null;
+  authorDisplayName: string;
+  isGuest: boolean;
+  messageText: string;
+  createdAt: string;
+}
+
+export interface GuestChatMessagesResponse {
+  items: GuestChatMessage[];
+  hasMore: boolean;
+}
+
+export async function listGuestChatMessages(
+  incidentId: string,
+  params: { before?: number; limit?: number } = {},
+): Promise<GuestChatMessagesResponse> {
+  const query = new URLSearchParams();
+  if (params.before) query.set("before", String(params.before));
+  if (params.limit) query.set("limit", String(params.limit));
+  const response = await guestApiFetch(`/guest/incidents/${incidentId}/chat/messages?${query.toString()}`);
+  return parseOrThrow<GuestChatMessagesResponse>(response);
+}
+
+export function guestChatSocketUrl(incidentId: string): string {
+  return `${API_BASE_URL.replace(/^http/, "ws")}/ws/guest/incidents/${incidentId}/chat`;
+}
+
+export interface GuestWarRoom {
+  status: "not_started" | "open" | "ended";
+  id: string | null;
+  openedByDisplayName: string | null;
+  openedAt: string | null;
+  endedByDisplayName: string | null;
+  endedAt: string | null;
+  activeSessionCount: number;
+}
+
+export async function getGuestWarRoom(incidentId: string): Promise<GuestWarRoom> {
+  const response = await guestApiFetch(`/guest/incidents/${incidentId}/war-room`);
+  return parseOrThrow<GuestWarRoom>(response);
+}
+
+export async function joinGuestWarRoom(incidentId: string): Promise<GuestWarRoom> {
+  const response = await guestApiFetch(`/guest/incidents/${incidentId}/war-room/join`, { method: "POST" });
+  return parseOrThrow<GuestWarRoom>(response);
+}
+
+export async function leaveGuestWarRoom(incidentId: string): Promise<GuestWarRoom> {
+  const response = await guestApiFetch(`/guest/incidents/${incidentId}/war-room/leave`, { method: "POST" });
+  return parseOrThrow<GuestWarRoom>(response);
+}

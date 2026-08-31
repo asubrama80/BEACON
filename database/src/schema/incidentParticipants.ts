@@ -42,6 +42,13 @@ export const incidentParticipants = pgTable(
     uniqueIndex("incident_participants_active_contact_idx")
       .on(table.incidentId, table.contactId)
       .where(sql`${table.status} != 'removed' AND ${table.contactId} IS NOT NULL`),
+    // Module 19 — the same duplicate-prevention guarantee for a verified Guest's auto-enrolled
+    // participant row, backing the race-safe idempotent enrollment in
+    // guestVerificationService.verifyOtp(). See claude/prompts/19-participant-management.md,
+    // "Auto-enrollment".
+    uniqueIndex("incident_participants_active_guest_idx")
+      .on(table.incidentId, table.guestInvitationId)
+      .where(sql`${table.status} != 'removed' AND ${table.guestInvitationId} IS NOT NULL`),
     // Explicit short name: the auto-generated name for this FK exceeds PostgreSQL's
     // 63-byte identifier limit and gets silently truncated (surfaced as a NOTICE on migrate).
     foreignKey({

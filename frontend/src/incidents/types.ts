@@ -1,6 +1,6 @@
 export type IncidentSeverity = "info" | "warning" | "high" | "critical";
 export type IncidentStatus = "open" | "active" | "resolved" | "closed";
-export type ParticipantType = "user" | "contact";
+export type ParticipantType = "user" | "contact" | "guest";
 
 export interface CommanderSummary {
   id: string;
@@ -41,7 +41,9 @@ export interface Participant {
   displayName: string;
   email: string | null;
   mobilePhone: string | null;
-  sourceStatus: string;
+  sourceStatus: string | null;
+  guestCapabilities: { chat: boolean; warRoom: boolean } | null;
+  guestVerifiedAt: string | null;
   addedAt: string;
 }
 

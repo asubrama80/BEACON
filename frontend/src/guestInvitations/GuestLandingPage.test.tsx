@@ -78,6 +78,7 @@ describe("GuestLandingPage", () => {
   });
 
   it("verifies the code and shows the authenticated Guest confirmation, without ever exposing the code", async () => {
+    let verified = false;
     mockRoutes({
       "GET /guest/invitations/:token": () => ({
         body: { valid: true, incidentNumber: "INC-1", incidentTitle: "T", guestName: "Jane Guest", maskedDestination: "j***@example.invalid" },
@@ -85,9 +86,14 @@ describe("GuestLandingPage", () => {
       "POST /guest/invitations/:token/otp/request": () => ({
         body: { maskedDestination: "j***@example.invalid", resendAvailableAt: "2026-01-01T00:01:00.000Z", otpExpiresAt: "2026-01-01T00:10:00.000Z" },
       }),
-      "POST /guest/invitations/:token/otp/verify": () => ({
-        body: { guestName: "Jane Guest", incidentId: "incident-1", sessionExpiresAt: "2026-01-01T12:00:00.000Z" },
-      }),
+      "POST /guest/invitations/:token/otp/verify": () => {
+        verified = true;
+        return { body: { guestName: "Jane Guest", incidentId: "incident-1", sessionExpiresAt: "2026-01-01T12:00:00.000Z" } };
+      },
+      "GET /guest/session": () =>
+        verified
+          ? { body: { guestName: "Jane Guest", incidentId: "incident-1", capabilities: { chat: false, warRoom: false } } }
+          : { status: 401, body: { error: "not_authenticated" } },
     });
     render(<GuestLandingPage token="raw-token-value" />);
     fireEvent.click(await screen.findByRole("button", { name: "Begin Verification" }));
@@ -121,8 +127,10 @@ describe("GuestLandingPage", () => {
   });
 
   it("restores the verified view on refresh when a valid Guest session already exists", async () => {
+    // Capabilities intentionally both false — this test only covers session-restore-on-refresh;
+    // Chat/War Room panel rendering is covered by their own dedicated component tests.
     mockRoutes({
-      "GET /guest/session": () => ({ body: { guestName: "Jane Guest", incidentId: "incident-1", capabilities: { chat: true, warRoom: false } } }),
+      "GET /guest/session": () => ({ body: { guestName: "Jane Guest", incidentId: "incident-1", capabilities: { chat: false, warRoom: false } } }),
     });
     render(<GuestLandingPage token="raw-token-value" />);
     await screen.findByText(/Welcome, Jane Guest/);

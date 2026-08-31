@@ -26,6 +26,9 @@ import { getSmsProvider, getEmailProvider } from "./modules/notifications/provid
 import { webhooksRoutes } from "./modules/notifications/webhooks/routes.js";
 import { chatRoutes } from "./modules/chat/routes.js";
 import { warRoomRoutes } from "./modules/warRoom/routes.js";
+import { loadGuestInvitationConfig, type GuestInvitationConfig } from "./modules/guestInvitations/config.js";
+import { guestInvitationRoutes } from "./modules/guestInvitations/routes.js";
+import { guestInvitationPublicRoutes } from "./modules/guestInvitations/publicRoutes.js";
 
 export interface BuildAppOptions {
   env?: AppEnv;
@@ -34,6 +37,7 @@ export interface BuildAppOptions {
   contactImportConfig?: ContactImportConfig;
   alertConfig?: AlertConfig;
   notificationConfig?: NotificationConfig;
+  guestInvitationConfig?: GuestInvitationConfig;
   /** Test-only seam for injecting a synthetic SNS signing certificate — never set in production. */
   sesFetchCert?: (url: string) => Promise<string>;
 }
@@ -45,6 +49,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const contactImportConfig = options.contactImportConfig ?? loadContactImportConfig();
   const alertConfig = options.alertConfig ?? loadAlertConfig();
   const notificationConfig = options.notificationConfig ?? loadNotificationConfig();
+  const guestInvitationConfig = options.guestInvitationConfig ?? loadGuestInvitationConfig();
   // Fail fast at startup if an unsupported/misconfigured provider is selected — never wait until
   // an operator tries to dispatch a real Alert to discover it. See
   // claude/prompts/10-notification-providers.md, "Provider registry".
@@ -91,6 +96,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.register((instance) => webhooksRoutes(instance, { notificationConfig, ...(options.sesFetchCert ? { sesFetchCert: options.sesFetchCert } : {}) }));
   app.register((instance) => chatRoutes(instance, { config: authConfig, corsOrigin: env.corsOrigin }));
   app.register((instance) => warRoomRoutes(instance, { config: authConfig }));
+  app.register((instance) => guestInvitationRoutes(instance, { config: authConfig, guestInvitationConfig, notificationConfig }));
+  app.register((instance) => guestInvitationPublicRoutes(instance));
 
   app.setErrorHandler((error: FastifyError | AuthError, request, reply) => {
     if (error instanceof AuthError) {

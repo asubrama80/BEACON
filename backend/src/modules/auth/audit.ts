@@ -53,7 +53,10 @@ export type AuthAuditEventType =
   | "ALERT_DISPATCH_COMPLETED"
   | "ALERT_DELIVERY_COMPLETED"
   | "WAR_ROOM_OPENED"
-  | "WAR_ROOM_ENDED";
+  | "WAR_ROOM_ENDED"
+  | "GUEST_INVITATION_CREATED"
+  | "GUEST_INVITATION_SENT"
+  | "GUEST_INVITATION_REVOKED";
 
 export interface RecordAuthEventInput {
   eventType: AuthAuditEventType;

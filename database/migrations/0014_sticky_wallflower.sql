@@ -1,0 +1,3 @@
+ALTER TABLE "guest_invitations" ADD COLUMN "revoked_by_user_id" uuid;--> statement-breakpoint
+ALTER TABLE "guest_invitations" ADD CONSTRAINT "guest_invitations_revoked_by_user_id_users_id_fk" FOREIGN KEY ("revoked_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "guest_invitations_token_hash_idx" ON "guest_invitations" USING btree ("token_hash");

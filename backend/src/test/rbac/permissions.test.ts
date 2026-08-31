@@ -67,6 +67,7 @@ describe.skipIf(!process.env.DATABASE_URL)("effective permissions (live database
       "groups.read",
       "incidents.chat.read",
       "incidents.command_center.read",
+      "incidents.guests.read",
       "incidents.read",
       "incidents.timeline.read",
       "incidents.war_room.read",
@@ -86,12 +87,13 @@ describe.skipIf(!process.env.DATABASE_URL)("effective permissions (live database
     ]);
 
     const perms = await getEffectivePermissions(db, userId);
-    // AUDITOR grants 14 permissions (Modules 03/04/06/07/08/09/11/12/13/14); RESPONDER's 8
-    // permissions are almost a subset of AUDITOR's, except RESPONDER also gets
-    // incidents.chat.send and incidents.war_room.join (send/participate access AUDITOR
-    // deliberately lacks, being read-only) — so the union is AUDITOR's 14 plus those two extras,
-    // 16 total. Never a duplicate (Set already guarantees this, but assert the count too).
-    expect(perms.size).toBe(16);
+    // AUDITOR grants 15 permissions (Modules 03/04/06/07/08/09/11/12/13/14/17); RESPONDER's 9
+    // permissions are almost a subset of AUDITOR's (including incidents.guests.read, which both
+    // roles now have), except RESPONDER also gets incidents.chat.send and
+    // incidents.war_room.join (send/participate access AUDITOR deliberately lacks, being
+    // read-only) — so the union is AUDITOR's 15 plus those two extras, 17 total. Never a
+    // duplicate (Set already guarantees this, but assert the count too).
+    expect(perms.size).toBe(17);
     expect([...perms].sort()).toEqual([
       "alerts.delivery.read",
       "alerts.read",
@@ -101,6 +103,7 @@ describe.skipIf(!process.env.DATABASE_URL)("effective permissions (live database
       "incidents.chat.read",
       "incidents.chat.send",
       "incidents.command_center.read",
+      "incidents.guests.read",
       "incidents.read",
       "incidents.timeline.read",
       "incidents.war_room.join",
@@ -143,6 +146,9 @@ describe.skipIf(!process.env.DATABASE_URL)("effective permissions (live database
         "incidents.command_center.read",
         "incidents.commander.assign",
         "incidents.create",
+        "incidents.guests.invite",
+        "incidents.guests.read",
+        "incidents.guests.revoke",
         "incidents.lifecycle.manage",
         "incidents.participants.manage",
         "incidents.read",

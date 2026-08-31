@@ -40,7 +40,11 @@ export type AuthErrorCode =
   | "recipient_not_submitted"
   | "invalid_delivery_status"
   | "war_room_already_open"
-  | "war_room_not_open";
+  | "war_room_not_open"
+  | "invitation_not_found"
+  | "invitation_expired"
+  | "invitation_revoked"
+  | "invitation_already_active";
 
 /**
  * A deliberately generic, safe error surfaced to the client — never a stack trace or DB

@@ -18,6 +18,7 @@ import {
   MODULE_12_PERMISSIONS,
   MODULE_13_PERMISSIONS,
   MODULE_14_PERMISSIONS,
+  MODULE_17_PERMISSIONS,
   type Module03PermissionCode,
   type Module04PermissionCode,
   type Module05PermissionCode,
@@ -30,6 +31,7 @@ import {
   type Module12PermissionCode,
   type Module13PermissionCode,
   type Module14PermissionCode,
+  type Module17PermissionCode,
 } from "./permissionCodes.js";
 
 const ROLE_NAMES: Record<SystemRoleCode, string> = {
@@ -71,6 +73,7 @@ const ALL_PERMISSIONS = [
   ...MODULE_12_PERMISSIONS,
   ...MODULE_13_PERMISSIONS,
   ...MODULE_14_PERMISSIONS,
+  ...MODULE_17_PERMISSIONS,
 ];
 type AnyPermissionCode =
   | Module03PermissionCode
@@ -84,7 +87,8 @@ type AnyPermissionCode =
   | Module11PermissionCode
   | Module12PermissionCode
   | Module13PermissionCode
-  | Module14PermissionCode;
+  | Module14PermissionCode
+  | Module17PermissionCode;
 
 /**
  * ADMIN gets full administrative control of every seeded permission. Other roles are granted
@@ -112,6 +116,7 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "incidents.command_center.read",
     "incidents.chat.read",
     "incidents.war_room.read",
+    "incidents.guests.read",
   ],
   INCIDENT_COMMANDER: [
     // users.read is newly justified by Module 08: assigning/changing an Incident's commander
@@ -145,6 +150,9 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "incidents.war_room.read",
     "incidents.war_room.manage",
     "incidents.war_room.join",
+    "incidents.guests.read",
+    "incidents.guests.invite",
+    "incidents.guests.revoke",
   ],
   COMMUNICATION_MANAGER: [
     "contacts.read",
@@ -179,6 +187,9 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     // operational decision. See claude/prompts/14-war-room-foundation.md, "Permissions".
     "incidents.war_room.read",
     "incidents.war_room.join",
+    "incidents.guests.read",
+    "incidents.guests.invite",
+    "incidents.guests.revoke",
   ],
   RESPONDER: [
     "incidents.read",
@@ -195,6 +206,9 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     "incidents.chat.send",
     "incidents.war_room.read",
     "incidents.war_room.join",
+    // Read-only — RESPONDER can see who's been invited but cannot invite/revoke, consistent
+    // with its existing exclusion from every other *.manage-style permission in this codebase.
+    "incidents.guests.read",
   ],
 };
 

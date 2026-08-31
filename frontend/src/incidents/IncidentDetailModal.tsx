@@ -23,6 +23,7 @@ import type { Contact } from "../contacts/types";
 import { useAuth } from "../auth/useAuth";
 import ChatPanel from "../chat/ChatPanel";
 import WarRoomPanel from "../warRoom/WarRoomPanel";
+import GuestInvitationsPanel from "../guestInvitations/GuestInvitationsPanel";
 
 interface NavigateToAlertsRequest {
   alertId?: string;
@@ -37,7 +38,7 @@ interface IncidentDetailModalProps {
   onNavigateToAlerts?: (request: NavigateToAlertsRequest) => void;
 }
 
-type Tab = "overview" | "commandCenter" | "participants" | "timeline" | "chat" | "warRoom";
+type Tab = "overview" | "commandCenter" | "participants" | "timeline" | "chat" | "warRoom" | "guests";
 
 const STATUS_BADGE: Record<string, string> = {
   open: "badge-neutral",
@@ -67,6 +68,9 @@ export default function IncidentDetailModal({
   const canReadWarRoom = user?.permissions.includes("incidents.war_room.read") ?? false;
   const canManageWarRoom = user?.permissions.includes("incidents.war_room.manage") ?? false;
   const canJoinWarRoom = user?.permissions.includes("incidents.war_room.join") ?? false;
+  const canReadGuests = user?.permissions.includes("incidents.guests.read") ?? false;
+  const canInviteGuests = user?.permissions.includes("incidents.guests.invite") ?? false;
+  const canRevokeGuests = user?.permissions.includes("incidents.guests.revoke") ?? false;
 
   const [tab, setTab] = useState<Tab>("overview");
   const [incident, setIncident] = useState<Incident | null>(null);
@@ -205,6 +209,15 @@ export default function IncidentDetailModal({
             War Room
           </button>
         )}
+        {canReadGuests && (
+          <button
+            type="button"
+            className={`btn btn-sm ${tab === "guests" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setTab("guests")}
+          >
+            Guest Invitations
+          </button>
+        )}
       </div>
 
       {tab === "overview" && (
@@ -276,6 +289,16 @@ export default function IncidentDetailModal({
           isClosed={isClosed}
           currentUserId={user.id}
           currentUserDisplayName={user.displayName}
+        />
+      )}
+
+      {tab === "guests" && (
+        <GuestInvitationsPanel
+          incidentId={incidentId}
+          canRead={canReadGuests}
+          canInvite={canInviteGuests}
+          canRevoke={canRevokeGuests}
+          isClosed={isClosed}
         />
       )}
     </Modal>

@@ -6,6 +6,7 @@ import { loadAuthConfig } from "../modules/auth/config.js";
 import { loadContactImportConfig } from "../modules/contactImport/config.js";
 import { loadAlertConfig } from "../modules/alerts/config.js";
 import { loadNotificationConfig } from "../modules/notifications/config.js";
+import { loadGuestInvitationConfig } from "../modules/guestInvitations/config.js";
 
 /** A fixed-per-process key so encrypted values created in one test are readable within the same run. */
 export const TEST_MFA_ENCRYPTION_KEY = randomBytes(32);
@@ -25,6 +26,7 @@ export function buildTestApp(
     // Twilio webhook tests, which need TWILIO_*/PUBLIC_BASE_URL overrides to actually take effect).
     alertConfig: loadAlertConfig(source),
     notificationConfig: loadNotificationConfig(source),
+    guestInvitationConfig: loadGuestInvitationConfig(source),
     ...(options.sesFetchCert ? { sesFetchCert: options.sesFetchCert } : {}),
   });
 }

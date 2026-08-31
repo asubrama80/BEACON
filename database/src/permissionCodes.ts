@@ -229,3 +229,16 @@ export const MODULE_14_PERMISSIONS = [
 ] as const;
 
 export type Module14PermissionCode = (typeof MODULE_14_PERMISSIONS)[number]["code"];
+
+/**
+ * Module 17's Guest Invitation permission codes. Gate the invitation-management surface only —
+ * never grant any capability to the Guest themselves (Guests never hold RBAC permissions at all;
+ * see claude/prompts/17-guest-invitations.md, "Guest vs User boundary").
+ */
+export const MODULE_17_PERMISSIONS = [
+  { code: "incidents.guests.read", name: "View guest invitations", description: "View an Incident's guest invitation list and status." },
+  { code: "incidents.guests.invite", name: "Invite guests", description: "Create a new guest invitation for an Incident." },
+  { code: "incidents.guests.revoke", name: "Revoke guest invitations", description: "Revoke an Incident's guest invitation." },
+] as const;
+
+export type Module17PermissionCode = (typeof MODULE_17_PERMISSIONS)[number]["code"];

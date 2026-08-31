@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "guest_invitations_active_email_idx" ON "guest_invitations" USING btree ("incident_id","email") WHERE "guest_invitations"."status" IN ('pending', 'sent') AND "guest_invitations"."revoked_at" IS NULL AND "guest_invitations"."email" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "guest_invitations_active_mobile_idx" ON "guest_invitations" USING btree ("incident_id","mobile_phone") WHERE "guest_invitations"."status" IN ('pending', 'sent') AND "guest_invitations"."revoked_at" IS NULL AND "guest_invitations"."mobile_phone" IS NOT NULL;

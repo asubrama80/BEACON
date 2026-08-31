@@ -6,6 +6,7 @@ import {
   timestamp,
   jsonb,
   index,
+  uniqueIndex,
   check,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -35,6 +36,8 @@ export const guestInvitations = pgTable(
     verifiedAt: timestamp("verified_at", { withTimezone: true }),
     joinedAt: timestamp("joined_at", { withTimezone: true }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    /** Module 17 — who revoked it, distinct from `invited_by`. Never set except alongside `revoked_at`. */
+    revokedByUserId: uuid("revoked_by_user_id").references(() => users.id, { onDelete: "set null" }),
     invitedBy: uuid("invited_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -42,6 +45,21 @@ export const guestInvitations = pgTable(
   (table) => [
     index("guest_invitations_incident_status_idx").on(table.incidentId, table.status),
     index("guest_invitations_expires_at_idx").on(table.expiresAt),
+    // Module 17 — guarantees hash uniqueness (belt-and-suspenders against a theoretical
+    // collision) and backs the public token-lookup endpoint's query.
+    uniqueIndex("guest_invitations_token_hash_idx").on(table.tokenHash),
+    // Module 17 — race-safe duplicate-invitation guard: at most one active (pending/sent,
+    // unrevoked) invitation per destination per Incident. Scoped to only the active statuses so
+    // a verified/joined/expired/revoked row never blocks re-inviting the same destination later.
+    // NULLs (the other destination column, when only one is set) are never considered equal by
+    // Postgres, so this never spuriously collides across two invitations that share only a NULL
+    // email or NULL mobile_phone.
+    uniqueIndex("guest_invitations_active_email_idx")
+      .on(table.incidentId, table.email)
+      .where(sql`${table.status} IN ('pending', 'sent') AND ${table.revokedAt} IS NULL AND ${table.email} IS NOT NULL`),
+    uniqueIndex("guest_invitations_active_mobile_idx")
+      .on(table.incidentId, table.mobilePhone)
+      .where(sql`${table.status} IN ('pending', 'sent') AND ${table.revokedAt} IS NULL AND ${table.mobilePhone} IS NOT NULL`),
     check(
       "guest_invitations_status_check",
       sql`${table.status} IN ('pending', 'sent', 'verified', 'joined', 'expired', 'revoked')`,

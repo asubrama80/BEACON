@@ -21,7 +21,7 @@ Work proceeds one module at a time, in order, unless the user directs otherwise.
 - [x] 14 War Room Foundation
 - [ ] 15 Audio/Video
 - [ ] 16 Screen Sharing
-- [ ] 17 Guest Invitations
+- [x] 17 Guest Invitations
 - [ ] 18 OTP Verification
 - [ ] 19 Participant Management
 - [ ] 20 Audit

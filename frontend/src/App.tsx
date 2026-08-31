@@ -9,8 +9,19 @@ import GroupsPage from "./groups/GroupsPage";
 import TemplatesPage from "./templates/TemplatesPage";
 import IncidentsPage from "./incidents/IncidentsPage";
 import AlertsPage from "./alerts/AlertsPage";
+import GuestLandingPage from "./guestInvitations/GuestLandingPage";
+
+const GUEST_INVITE_PATH = /^\/guest\/invite\/(.+)$/;
 
 export default function App(): JSX.Element {
+  // A public guest-invitation link has no BEACON session — render it entirely outside
+  // AuthProvider/AppShell, before any authenticated-app machinery runs. See
+  // claude/prompts/17-guest-invitations.md, "Public landing page routing".
+  const guestInviteMatch = window.location.pathname.match(GUEST_INVITE_PATH);
+  if (guestInviteMatch) {
+    return <GuestLandingPage token={decodeURIComponent(guestInviteMatch[1]!)} />;
+  }
+
   return (
     <AuthProvider>
       <AppShell />

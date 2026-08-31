@@ -7,6 +7,7 @@ import type { AuthConfig } from "../auth/config.js";
 import { recordAuthEvent } from "../auth/audit.js";
 import { revokeAllSessionsForUser } from "../auth/session.js";
 import { getUserRoles, getEffectivePermissions } from "../rbac/permissions.js";
+import { findActiveMfaCredential } from "../auth/userAuth.js";
 import { assertNotLastActiveAdmin } from "./lastAdmin.js";
 import { assertNotBreakGlass } from "./breakGlass.js";
 import {
@@ -23,11 +24,12 @@ async function loadDetail(db: Database, userId: string): Promise<UserDetailDto> 
   if (!user) {
     throw new AuthError(404, "not_found", "User not found.");
   }
-  const [roleRows, effectivePermissions] = await Promise.all([
+  const [roleRows, effectivePermissions, activeMfa] = await Promise.all([
     getUserRoles(db, userId),
     getEffectivePermissions(db, userId),
+    findActiveMfaCredential(db, userId),
   ]);
-  return toUserDetailDto(user, roleRows, [...effectivePermissions]);
+  return toUserDetailDto(user, roleRows, [...effectivePermissions], !!activeMfa);
 }
 
 export interface ListUsersOptions {

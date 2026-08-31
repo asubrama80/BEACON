@@ -20,6 +20,7 @@ import {
   MODULE_14_PERMISSIONS,
   MODULE_17_PERMISSIONS,
   MODULE_20_PERMISSIONS,
+  MODULE_22_PERMISSIONS,
   type Module03PermissionCode,
   type Module04PermissionCode,
   type Module05PermissionCode,
@@ -34,6 +35,7 @@ import {
   type Module14PermissionCode,
   type Module17PermissionCode,
   type Module20PermissionCode,
+  type Module22PermissionCode,
 } from "./permissionCodes.js";
 
 const ROLE_NAMES: Record<SystemRoleCode, string> = {
@@ -77,6 +79,7 @@ const ALL_PERMISSIONS = [
   ...MODULE_14_PERMISSIONS,
   ...MODULE_17_PERMISSIONS,
   ...MODULE_20_PERMISSIONS,
+  ...MODULE_22_PERMISSIONS,
 ];
 type AnyPermissionCode =
   | Module03PermissionCode
@@ -92,7 +95,8 @@ type AnyPermissionCode =
   | Module13PermissionCode
   | Module14PermissionCode
   | Module17PermissionCode
-  | Module20PermissionCode;
+  | Module20PermissionCode
+  | Module22PermissionCode;
 
 /**
  * ADMIN gets full administrative control of every seeded permission. Other roles are granted
@@ -124,6 +128,11 @@ const ROLE_PERMISSION_MAP: Record<SystemRoleCode, readonly AnyPermissionCode[]> 
     // Module 20 — this is the role's namesake capability: "Auditor" exists specifically to
     // review BEACON's own accountability record.
     "audit.read",
+    // Module 22 — visibility into system/security status and role-to-permission mapping is
+    // compliance-relevant, consistent with AUDITOR's existing broad-read-access pattern.
+    // Deliberately read-only: AUDITOR never gets admin.manage (it never performs mutations
+    // anywhere else in this codebase either).
+    "admin.read",
   ],
   INCIDENT_COMMANDER: [
     // users.read is newly justified by Module 08: assigning/changing an Incident's commander

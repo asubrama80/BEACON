@@ -26,7 +26,7 @@ Work proceeds one module at a time, in order, unless the user directs otherwise.
 - [x] 19 Participant Management
 - [x] 20 Audit
 - [x] 21 Dashboard & History
-- [ ] 22 Administration
+- [x] 22 Administration
 - [ ] 23 Security Hardening
 - [ ] 24 Testing
 - [ ] 25 Docker Deployment

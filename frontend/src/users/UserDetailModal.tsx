@@ -10,6 +10,7 @@ import {
   resetPassword,
   updateUser,
 } from "./api";
+import { resetUserMfaAdmin, revokeUserSessionsAdmin } from "../admin/api";
 import type { RoleRef, UserDetail } from "./types";
 import { useAuth } from "../auth/useAuth";
 
@@ -29,10 +30,13 @@ export default function UserDetailModal({ userId, onClose, onChanged }: UserDeta
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmingDisable, setConfirmingDisable] = useState(false);
+  const [confirmingSessionRevoke, setConfirmingSessionRevoke] = useState(false);
+  const [confirmingMfaReset, setConfirmingMfaReset] = useState(false);
 
   const canManageRoles = currentUser?.permissions.includes("users.roles.assign") ?? false;
   const canUpdate = currentUser?.permissions.includes("users.update") ?? false;
   const canDisable = currentUser?.permissions.includes("users.disable") ?? false;
+  const canAdminManage = currentUser?.permissions.includes("admin.manage") ?? false;
 
   async function refresh(): Promise<void> {
     const fresh = await getUser(userId);
@@ -174,6 +178,69 @@ export default function UserDetailModal({ userId, onClose, onChanged }: UserDeta
           )}
         </div>
       </div>
+
+      {!detail.isBreakGlass && canAdminManage && (
+        <div className="detail-section">
+          <div className="detail-section-title">Security actions</div>
+          <div className="detail-actions" style={{ marginBottom: 8 }}>
+            {confirmingSessionRevoke ? (
+              <>
+                <span className="cell-muted">Force this User to sign in again on all devices?</span>
+                <button
+                  type="button"
+                  className="btn btn-danger btn-sm"
+                  disabled={busy}
+                  onClick={() =>
+                    void withBusy(async () => {
+                      await revokeUserSessionsAdmin(detail.id);
+                      setConfirmingSessionRevoke(false);
+                    })
+                  }
+                >
+                  Confirm revoke sessions
+                </button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfirmingSessionRevoke(false)}>
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfirmingSessionRevoke(true)}>
+                Revoke active sessions
+              </button>
+            )}
+          </div>
+          <div className="detail-actions">
+            <span className="cell-muted">MFA: {detail.mfaEnabled ? "Enabled" : "Not enabled"}</span>
+            {detail.mfaEnabled &&
+              (confirmingMfaReset ? (
+                <>
+                  <span className="cell-muted">Reset MFA and require re-enrollment?</span>
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-sm"
+                    disabled={busy}
+                    onClick={() =>
+                      void withBusy(async () => {
+                        await resetUserMfaAdmin(detail.id);
+                        setConfirmingMfaReset(false);
+                        await refresh();
+                      })
+                    }
+                  >
+                    Confirm reset MFA
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfirmingMfaReset(false)}>
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfirmingMfaReset(true)}>
+                  Reset MFA
+                </button>
+              ))}
+          </div>
+        </div>
+      )}
 
       {!detail.isBreakGlass && canUpdate && (
         <div className="detail-section">

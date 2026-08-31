@@ -17,6 +17,7 @@ export interface UserSummary {
 
 export interface UserDetail extends UserSummary {
   effectivePermissions: string[];
+  mfaEnabled: boolean;
 }
 
 export interface UsersListResponse {

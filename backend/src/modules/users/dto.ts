@@ -19,6 +19,9 @@ export interface UserSummaryDto {
 
 export interface UserDetailDto extends UserSummaryDto {
   effectivePermissions: string[];
+  /** Module 22 — whether MFA is currently enabled, so Administration can offer an MFA-reset
+   * action only when one is actually applicable. Never the secret itself. */
+  mfaEnabled: boolean;
 }
 
 export interface UserRow {
@@ -48,9 +51,11 @@ export function toUserDetailDto(
   user: UserRow,
   roles: UserRoleRecord[],
   effectivePermissions: string[],
+  mfaEnabled: boolean,
 ): UserDetailDto {
   return {
     ...toUserSummaryDto(user, roles),
     effectivePermissions: [...effectivePermissions].sort(),
+    mfaEnabled,
   };
 }

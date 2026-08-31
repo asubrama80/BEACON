@@ -61,7 +61,9 @@ export type AuthAuditEventType =
   | "GUEST_VERIFICATION_SUCCEEDED"
   | "GUEST_VERIFICATION_FAILED_LIMIT"
   | "GUEST_SESSION_REVOKED"
-  | "GUEST_ACCESS_REVOKED";
+  | "GUEST_ACCESS_REVOKED"
+  | "USER_SESSIONS_ADMIN_REVOKED"
+  | "MFA_ADMIN_RESET";
 
 /** Module 20 — the audit `actor_type` check constraint already allowed `'guest'`, but nothing
  * could ever select it: `recordAuthEvent()` inferred `actorType` purely from whether `actorId`

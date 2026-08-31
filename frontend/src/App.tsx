@@ -12,6 +12,7 @@ import AlertsPage from "./alerts/AlertsPage";
 import GuestLandingPage from "./guestInvitations/GuestLandingPage";
 import AuditPage from "./audit/AuditPage";
 import DashboardPage from "./dashboard/DashboardPage";
+import AdministrationPage from "./admin/AdministrationPage";
 
 const GUEST_INVITE_PATH = /^\/guest\/invite\/(.+)$/;
 
@@ -31,7 +32,7 @@ export default function App(): JSX.Element {
   );
 }
 
-type View = "dashboard" | "users" | "contacts" | "groups" | "templates" | "incidents" | "alerts" | "audit";
+type View = "dashboard" | "users" | "contacts" | "groups" | "templates" | "incidents" | "alerts" | "audit" | "administration";
 
 function AppShell(): JSX.Element {
   const { user, loading, logout } = useAuth();
@@ -62,6 +63,7 @@ function AppShell(): JSX.Element {
   const canViewIncidents = user.permissions.includes("incidents.read");
   const canViewAlerts = user.permissions.includes("alerts.read");
   const canViewAudit = user.permissions.includes("audit.read");
+  const canViewAdmin = user.permissions.includes("admin.read");
 
   return (
     <div className="app-shell">
@@ -87,7 +89,7 @@ function AppShell(): JSX.Element {
           <p className="app-shell-subtitle">Emergency Communication Platform</p>
         </div>
 
-        {(canViewUsers || canViewContacts || canViewGroups || canViewTemplates || canViewIncidents || canViewAlerts || canViewAudit) && (
+        {(canViewUsers || canViewContacts || canViewGroups || canViewTemplates || canViewIncidents || canViewAlerts || canViewAudit || canViewAdmin) && (
           <nav className="app-shell-nav">
             <button
               type="button"
@@ -159,6 +161,15 @@ function AppShell(): JSX.Element {
                 Audit
               </button>
             )}
+            {canViewAdmin && (
+              <button
+                type="button"
+                className={`app-shell-nav-link ${view === "administration" ? "is-active" : ""}`}
+                onClick={() => setView("administration")}
+              >
+                Administration
+              </button>
+            )}
           </nav>
         )}
 
@@ -185,6 +196,11 @@ function AppShell(): JSX.Element {
           <TemplatesPage />
         ) : view === "audit" && canViewAudit ? (
           <AuditPage />
+        ) : view === "administration" && canViewAdmin ? (
+          <AdministrationPage
+            onNavigateToUsers={canViewUsers ? () => setView("users") : undefined}
+            onNavigateToAudit={canViewAudit ? () => setView("audit") : undefined}
+          />
         ) : (
           <DashboardPage
             onNavigateToIncidents={canViewIncidents ? () => setView("incidents") : undefined}

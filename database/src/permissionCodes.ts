@@ -254,3 +254,19 @@ export const MODULE_20_PERMISSIONS = [
 ] as const;
 
 export type Module20PermissionCode = (typeof MODULE_20_PERMISSIONS)[number]["code"];
+
+/**
+ * Module 22's Administration permissions — deliberately minimal (two codes), per the module
+ * spec's "do not add broad permission merely for convenience if existing granular permissions
+ * suffice" guidance. User/role management itself continues to use Module 03's existing
+ * `users.*`/`roles.read`/`permissions.read` codes; these two cover only what's genuinely new:
+ * viewing system/security status and the role-to-permission mapping (`admin.read`), and the two
+ * new admin-privileged security actions, session revoke and MFA reset (`admin.manage`). See
+ * claude/prompts/22-administration.md, "Permissions".
+ */
+export const MODULE_22_PERMISSIONS = [
+  { code: "admin.read", name: "View administration status", description: "View system/security status and the role-to-permission mapping." },
+  { code: "admin.manage", name: "Perform administrative security actions", description: "Revoke a User's sessions or reset a User's MFA enrollment." },
+] as const;
+
+export type Module22PermissionCode = (typeof MODULE_22_PERMISSIONS)[number]["code"];

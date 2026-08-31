@@ -34,6 +34,7 @@ import { guestVerificationPublicRoutes } from "./modules/guestVerification/publi
 import "./modules/guestVerification/types.js";
 import { auditRoutes } from "./modules/audit/routes.js";
 import { dashboardRoutes } from "./modules/dashboard/routes.js";
+import { adminRoutes } from "./modules/admin/routes.js";
 
 export interface BuildAppOptions {
   env?: AppEnv;
@@ -117,6 +118,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   );
   app.register((instance) => auditRoutes(instance, { config: authConfig }));
   app.register((instance) => dashboardRoutes(instance, { config: authConfig }));
+  app.register((instance) => adminRoutes(instance, { env, config: authConfig, notificationConfig }));
 
   app.setErrorHandler((error: FastifyError | AuthError, request, reply) => {
     if (error instanceof AuthError) {

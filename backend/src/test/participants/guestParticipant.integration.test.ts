@@ -444,6 +444,39 @@ describe.skipIf(!process.env.DATABASE_URL)("guest participant / chat / war room 
       const response = await app.inject({ method: "GET", url: `/guest/incidents/${incidentId}/chat/messages`, ...guestAuth(guest) });
       expect(response.statusCode).toBe(200);
     });
+
+    it("Module 23 — a still-open WebSocket cannot keep sending after the Guest is removed mid-connection", async () => {
+      // Removing a Guest revokes their session cookie (denying any *new* handshake), but a
+      // connection opened before removal isn't proactively closed — `sendGuestMessage()` must
+      // re-check the participant's live status on every send rather than trusting the
+      // connection-time snapshot indefinitely. See claude/prompts/23-security-hardening.md,
+      // "Guest chat re-validation".
+      const incidentId = await createRawIncident();
+      const guest = await inviteAndVerifyGuest(incidentId, { chat: true, warRoom: false }, "Soon Removed Guest");
+
+      const ws = connect(incidentId, guest);
+      await waitForOpen(ws);
+      await nextMessage(ws); // "connected"
+
+      const [participantRow] = await db
+        .select({ id: incidentParticipants.id })
+        .from(incidentParticipants)
+        .where(eq(incidentParticipants.guestInvitationId, guest.invitationId));
+      const removeResponse = await app.inject({
+        method: "DELETE",
+        url: `/incidents/${incidentId}/participants/${participantRow!.id}`,
+        ...authHeaders(commander),
+      });
+      expect(removeResponse.statusCode).toBe(204);
+
+      ws.send(JSON.stringify({ type: "send", body: "should be rejected", requestId: "g-removed" }));
+      const result = await nextMessage(ws);
+      expect(result).toMatchObject({ type: "error", error: "send_failed", requestId: "g-removed" });
+
+      const rows = await db.select().from(chatMessages).where(eq(chatMessages.incidentId, incidentId));
+      expect(rows.find((r) => r.messageText === "should be rejected")).toBeUndefined();
+      ws.close();
+    });
   });
 
   describe("Guest War Room", () => {

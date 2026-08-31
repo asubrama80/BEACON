@@ -167,12 +167,17 @@ export async function disableUser(db: Database, userId: string, actorId: string)
     throw new AuthError(404, "not_found", "User not found.");
   }
   assertNotBreakGlass(current);
-  await assertNotLastActiveAdmin(db, userId);
 
-  await db.update(users).set({ status: "inactive", updatedAt: new Date() }).where(eq(users.id, userId));
-  await revokeAllSessionsForUser(db, userId);
-
-  await recordAuthEvent(db, { eventType: "USER_DISABLED", actorId, resourceType: "user", resourceId: userId });
+  // Module 23 — the last-admin check and the actual disable must happen inside one transaction,
+  // with `assertNotLastActiveAdmin` locking the candidate admin rows, or two concurrent disables
+  // of two different admins could both pass the check before either commits. See
+  // claude/prompts/23-security-hardening.md, "Last-admin race condition".
+  await db.transaction(async (tx) => {
+    await assertNotLastActiveAdmin(tx, userId);
+    await tx.update(users).set({ status: "inactive", updatedAt: new Date() }).where(eq(users.id, userId));
+    await revokeAllSessionsForUser(tx, userId);
+    await recordAuthEvent(tx, { eventType: "USER_DISABLED", actorId, resourceType: "user", resourceId: userId });
+  });
 
   return loadDetail(db, userId);
 }
@@ -257,27 +262,32 @@ export async function removeRole(
   }
   assertNotBreakGlass(current);
 
-  if (roleCode === "ADMIN") {
-    await assertNotLastActiveAdmin(db, userId);
-  }
-
   const [roleIdResolved] = await resolveRoleIds(db, [roleCode]);
   const roleId = roleIdResolved!;
 
-  const deleted = await db
-    .delete(userRoles)
-    .where(and(eq(userRoles.userId, userId), eq(userRoles.roleId, roleId)))
-    .returning({ id: userRoles.id });
-  if (deleted.length === 0) {
-    throw new AuthError(404, "not_found", `User does not have the ${roleCode} role.`);
-  }
+  // Module 23 — same race-safety requirement as disableUser(): the last-admin check and the
+  // actual role removal must happen inside one transaction so two concurrent ADMIN-role removals
+  // can't both pass the check before either commits.
+  await db.transaction(async (tx) => {
+    if (roleCode === "ADMIN") {
+      await assertNotLastActiveAdmin(tx, userId);
+    }
 
-  await recordAuthEvent(db, {
-    eventType: "USER_ROLE_REMOVED",
-    actorId,
-    resourceType: "user",
-    resourceId: userId,
-    metadata: { roleCode },
+    const deleted = await tx
+      .delete(userRoles)
+      .where(and(eq(userRoles.userId, userId), eq(userRoles.roleId, roleId)))
+      .returning({ id: userRoles.id });
+    if (deleted.length === 0) {
+      throw new AuthError(404, "not_found", `User does not have the ${roleCode} role.`);
+    }
+
+    await recordAuthEvent(tx, {
+      eventType: "USER_ROLE_REMOVED",
+      actorId,
+      resourceType: "user",
+      resourceId: userId,
+      metadata: { roleCode },
+    });
   });
 
   return loadDetail(db, userId);

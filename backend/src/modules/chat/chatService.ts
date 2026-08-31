@@ -1,6 +1,7 @@
 import type { Database } from "@beacon/database";
 import { AuthError } from "../auth/errors.js";
 import { findIncidentById } from "../incidents/incidentQueries.js";
+import { findParticipantRowById } from "../incidents/participantQueries.js";
 import { insertMessage, findMessageById, listMessages as queryMessages, normalizeLimit } from "./chatQueries.js";
 import { toChatMessageDto, type ChatMessageDto } from "./chatDto.js";
 
@@ -56,6 +57,15 @@ export async function sendMessage(db: Database, incidentId: string, userId: stri
 export async function sendGuestMessage(db: Database, incidentId: string, participantId: string, rawText: string): Promise<ChatMessageDto> {
   const trimmed = validateBody(rawText);
   await assertIncidentOpenForChat(db, incidentId);
+  // Module 23 — a Guest's WebSocket connection can outlive their removal from the Incident
+  // roster (removal revokes the session cookie for *future* handshakes, but doesn't proactively
+  // close an already-open socket). Re-checking the participant's current status on every send —
+  // not just at connection time — closes that window instead of trusting the connection-time
+  // snapshot indefinitely. See claude/prompts/23-security-hardening.md, "Guest chat re-validation".
+  const participant = await findParticipantRowById(db, incidentId, participantId);
+  if (!participant || participant.status === "removed") {
+    throw new AuthError(403, "guest_removed", "This Guest's access to the Incident has been revoked.");
+  }
 
   const { id } = await insertMessage(db, { incidentId, authorType: "guest", participantId, messageText: trimmed });
   const row = await findMessageById(db, id);

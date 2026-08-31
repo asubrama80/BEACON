@@ -38,9 +38,18 @@ describe("provider config and registry", () => {
     expect(() => getEmailProvider(config)).toThrow(/AWS_REGION/);
   });
 
-  it("falls back to mock for an unrecognized provider name rather than throwing at config-load time", () => {
-    const config = loadNotificationConfig({ SMS_PROVIDER: "unknown-provider" as never });
+  it("fails startup for an unrecognized explicit SMS_PROVIDER value rather than silently falling back to mock", () => {
+    expect(() => loadNotificationConfig({ SMS_PROVIDER: "unknown-provider" })).toThrow(/Unknown SMS_PROVIDER/);
+  });
+
+  it("fails startup for an unrecognized explicit EMAIL_PROVIDER value rather than silently falling back to mock", () => {
+    expect(() => loadNotificationConfig({ EMAIL_PROVIDER: "unknown-provider" })).toThrow(/Unknown EMAIL_PROVIDER/);
+  });
+
+  it("still defaults to mock when the provider env var is simply unset", () => {
+    const config = loadNotificationConfig({});
     expect(config.smsProvider).toBe("mock");
+    expect(config.emailProvider).toBe("mock");
   });
 
   it("provider status never exposes credential values, only safe metadata", () => {

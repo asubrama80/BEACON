@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyError } from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
 import formbody from "@fastify/formbody";
@@ -69,6 +70,19 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({ logger: env.nodeEnv !== "test" });
 
   app.register(cookie);
+  // Module 23 — baseline HTTP security headers (CSP, X-Content-Type-Options, frame-ancestors/
+  // X-Frame-Options, Referrer-Policy, etc). This app never serves HTML/JS itself (the frontend is
+  // a separate Vite/nginx origin), so a maximally strict `default-src 'none'` CSP is safe — there
+  // is no inline script/style of its own to accommodate. `crossOriginResourcePolicy` is
+  // deliberately relaxed to "cross-origin" since this API is designed to be fetched from a
+  // different origin (see the CORS comment below) — the default "same-origin" would fight that.
+  // HSTS is production-only; forcing it under plain http in local dev would be a meaningless,
+  // confusing header. See claude/prompts/23-security-hardening.md, "Security headers".
+  app.register(helmet, {
+    contentSecurityPolicy: { directives: { defaultSrc: ["'none'"] } },
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    hsts: env.nodeEnv === "production" ? { maxAge: 15552000, includeSubDomains: true } : false,
+  });
   // credentials:true is required so the browser sends/accepts the session and CSRF cookies
   // across the frontend/backend origin split in local dev (Vite on :5173, API on :4000).
   // origin is an explicit allow-list (never "*") because credentials:true forbids a wildcard.
@@ -90,6 +104,16 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // oversized WebSocket frame — see claude/prompts/13-realtime-incident-chat.md, "Payload
   // validation".
   app.register(websocket, { options: { maxPayload: 16 * 1024 } });
+
+  // Module 23 — this backend never serves static/cacheable assets (that's the separate
+  // frontend/nginx origin's job), and nearly every response here is either authenticated,
+  // Guest-session-scoped, or a mutation — never safe for a browser back/forward cache or a
+  // shared proxy to retain. A blanket no-store default costs nothing since there is nothing
+  // here that benefits from caching. See claude/prompts/23-security-hardening.md, "Cache
+  // control".
+  app.addHook("onSend", async (_request, reply) => {
+    reply.header("cache-control", "no-store");
+  });
 
   app.register((instance) => healthRoutes(instance, env));
   app.register((instance) => authRoutes(instance, { config: authConfig, mfaEncryptionKey }));

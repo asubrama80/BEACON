@@ -48,7 +48,8 @@ export type AuthErrorCode =
   | "otp_expired"
   | "otp_invalid"
   | "otp_attempts_exceeded"
-  | "otp_resend_too_soon";
+  | "otp_resend_too_soon"
+  | "guest_removed";
 
 /**
  * A deliberately generic, safe error surfaced to the client — never a stack trace or DB

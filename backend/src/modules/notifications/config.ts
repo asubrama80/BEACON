@@ -34,14 +34,23 @@ export interface NotificationConfig {
   publicBaseUrl: string;
 }
 
+/**
+ * Unset (or empty) means "no explicit choice" and defaults to mock — but an explicit,
+ * unrecognized value (e.g. a typo like "twilio-typo") must fail startup rather than silently
+ * falling back to mock, which would otherwise send real messages through no real channel at all
+ * without ever surfacing an error. See claude/prompts/23-security-hardening.md, "Provider
+ * configuration hardening".
+ */
 function readSmsProvider(value: string | undefined): SmsProviderName {
-  if (value === "twilio") return "twilio";
-  return "mock";
+  if (value === undefined || value === "") return "mock";
+  if (value === "mock" || value === "twilio") return value;
+  throw new Error(`Unknown SMS_PROVIDER "${value}" — expected "mock" or "twilio".`);
 }
 
 function readEmailProvider(value: string | undefined): EmailProviderName {
-  if (value === "ses") return "ses";
-  return "mock";
+  if (value === undefined || value === "") return "mock";
+  if (value === "mock" || value === "ses") return value;
+  throw new Error(`Unknown EMAIL_PROVIDER "${value}" — expected "mock" or "ses".`);
 }
 
 export function loadNotificationConfig(source: NodeJS.ProcessEnv = process.env): NotificationConfig {

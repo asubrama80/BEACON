@@ -5,6 +5,8 @@ export * from "./groups.js";
 export * from "./templates.js";
 export * from "./incidents.js";
 export * from "./guestInvitations.js";
+export * from "./guestOtpChallenges.js";
+export * from "./guestSessions.js";
 export * from "./incidentParticipants.js";
 export * from "./incidentTimelineEvents.js";
 export * from "./alerts.js";

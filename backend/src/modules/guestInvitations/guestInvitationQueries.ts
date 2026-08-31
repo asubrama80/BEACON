@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { guestInvitations, incidents, users, type Database, type DbOrTx } from "@beacon/database";
 import type { GuestInvitationRow } from "./guestInvitationDto.js";
@@ -155,6 +155,57 @@ export async function findPublicInvitationByTokenHash(db: Database, tokenHash: s
     .from(guestInvitations)
     .innerJoin(incidents, eq(incidents.id, guestInvitations.incidentId))
     .where(eq(guestInvitations.tokenHash, tokenHash))
+    .limit(1);
+  return row;
+}
+
+/**
+ * Conditional UPDATE — WHERE status NOT IN ('verified','joined') makes this idempotent-safe under
+ * a concurrent double-verify (see claude/prompts/18-otp-verification.md, "Concurrent verification"):
+ * the first caller to land here wins and does the one-time verified-state side effects; a losing
+ * concurrent caller's update simply affects 0 rows, which is not an error.
+ */
+export async function markInvitationVerified(db: DbOrTx, id: string): Promise<boolean> {
+  const result = await db
+    .update(guestInvitations)
+    .set({ status: "verified", verifiedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(guestInvitations.id, id), sql`${guestInvitations.status} NOT IN ('verified', 'joined')`))
+    .returning({ id: guestInvitations.id });
+  return result.length > 0;
+}
+
+export interface InvitationAuthContextRow {
+  id: string;
+  incidentId: string;
+  guestName: string;
+  status: string;
+  permissions: unknown;
+  expiresAt: Date;
+  revokedAt: Date | null;
+  incidentStatus: string;
+}
+
+/**
+ * The full context Module 18 (issuing a session) and Module 19 (`authenticateGuest()`) need —
+ * distinct from `PublicLookupRow` because it also carries `permissions` (capabilities), which the
+ * public pre-verification landing page must never see for an *unverified* invitation's own
+ * safety reasoning, but which an authenticated Guest's own session context legitimately needs.
+ */
+export async function findInvitationAuthContext(db: DbOrTx, invitationId: string): Promise<InvitationAuthContextRow | undefined> {
+  const [row] = await db
+    .select({
+      id: guestInvitations.id,
+      incidentId: guestInvitations.incidentId,
+      guestName: guestInvitations.guestName,
+      status: guestInvitations.status,
+      permissions: guestInvitations.permissions,
+      expiresAt: guestInvitations.expiresAt,
+      revokedAt: guestInvitations.revokedAt,
+      incidentStatus: incidents.status,
+    })
+    .from(guestInvitations)
+    .innerJoin(incidents, eq(incidents.id, guestInvitations.incidentId))
+    .where(eq(guestInvitations.id, invitationId))
     .limit(1);
   return row;
 }

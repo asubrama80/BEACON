@@ -22,7 +22,7 @@ Work proceeds one module at a time, in order, unless the user directs otherwise.
 - [ ] 15 Audio/Video
 - [ ] 16 Screen Sharing
 - [x] 17 Guest Invitations
-- [ ] 18 OTP Verification
+- [x] 18 OTP Verification
 - [ ] 19 Participant Management
 - [ ] 20 Audit
 - [ ] 21 Dashboard & History

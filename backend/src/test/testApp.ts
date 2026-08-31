@@ -7,13 +7,14 @@ import { loadContactImportConfig } from "../modules/contactImport/config.js";
 import { loadAlertConfig } from "../modules/alerts/config.js";
 import { loadNotificationConfig } from "../modules/notifications/config.js";
 import { loadGuestInvitationConfig } from "../modules/guestInvitations/config.js";
+import { loadGuestVerificationConfig } from "../modules/guestVerification/config.js";
 
 /** A fixed-per-process key so encrypted values created in one test are readable within the same run. */
 export const TEST_MFA_ENCRYPTION_KEY = randomBytes(32);
 
 export function buildTestApp(
   envOverrides: NodeJS.ProcessEnv = {},
-  options: { sesFetchCert?: (url: string) => Promise<string> } = {},
+  options: { sesFetchCert?: (url: string) => Promise<string>; onOtpGenerated?: (code: string) => void } = {},
 ): FastifyInstance {
   const source = { NODE_ENV: "test", ...envOverrides };
   return buildApp({
@@ -27,6 +28,8 @@ export function buildTestApp(
     alertConfig: loadAlertConfig(source),
     notificationConfig: loadNotificationConfig(source),
     guestInvitationConfig: loadGuestInvitationConfig(source),
+    guestVerificationConfig: loadGuestVerificationConfig(source),
     ...(options.sesFetchCert ? { sesFetchCert: options.sesFetchCert } : {}),
+    ...(options.onOtpGenerated ? { onOtpGenerated: options.onOtpGenerated } : {}),
   });
 }

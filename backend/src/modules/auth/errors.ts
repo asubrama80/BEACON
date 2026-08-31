@@ -44,7 +44,11 @@ export type AuthErrorCode =
   | "invitation_not_found"
   | "invitation_expired"
   | "invitation_revoked"
-  | "invitation_already_active";
+  | "invitation_already_active"
+  | "otp_expired"
+  | "otp_invalid"
+  | "otp_attempts_exceeded"
+  | "otp_resend_too_soon";
 
 /**
  * A deliberately generic, safe error surfaced to the client — never a stack trace or DB

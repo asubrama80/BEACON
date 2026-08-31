@@ -4,6 +4,7 @@ import { recordAuthEvent } from "../auth/audit.js";
 import { appendTimelineEvent } from "../incidents/timelineQueries.js";
 import { findIncidentById } from "../incidents/incidentQueries.js";
 import { normalizeEmail, normalizePhone } from "../contacts/normalization.js";
+import { maskEmail, maskPhone } from "./maskDestination.js";
 import type { NotificationConfig } from "../notifications/config.js";
 import type { GuestInvitationConfig } from "./config.js";
 import { generateInvitationToken, hashInvitationToken } from "./token.js";
@@ -32,18 +33,6 @@ async function assertIncidentOpenForInvites(db: Database, incidentId: string): P
   if (incident.status === "closed") {
     throw new AuthError(409, "incident_closed", "This Incident is closed; a guest cannot be invited.");
   }
-}
-
-function maskEmail(email: string): string {
-  const [local, domain] = email.split("@");
-  if (!local || !domain) return "***";
-  const visible = local.slice(0, 1);
-  return `${visible}${"*".repeat(Math.max(local.length - 1, 3))}@${domain}`;
-}
-
-function maskPhone(phone: string): string {
-  const last4 = phone.slice(-4);
-  return `***-***-${last4}`;
 }
 
 export interface CreateInvitationInput {

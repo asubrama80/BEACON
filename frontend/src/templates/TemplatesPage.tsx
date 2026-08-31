@@ -104,7 +104,7 @@ export default function TemplatesPage(): JSX.Element {
       </div>
 
       {!loading && items.length === 0 && (
-        <div className="empty-state">
+        <div className="card empty-state">
           <p>No templates found.</p>
         </div>
       )}

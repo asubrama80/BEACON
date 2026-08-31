@@ -40,9 +40,11 @@ describe("AdministrationPage", () => {
     mockAdmin();
     render(<AdministrationPage />);
     await screen.findByText("beacon-backend");
-    expect(screen.getByText("v0.0.0 · test")).toBeInTheDocument();
+    expect(screen.getByText("0.0.0")).toBeInTheDocument();
+    expect(screen.getByText("test")).toBeInTheDocument();
     expect(screen.getByText("Connected")).toBeInTheDocument();
-    expect(screen.getByText("SMS: mock · Email: mock")).toBeInTheDocument();
+    expect(screen.getByText("SMS Provider — mock")).toBeInTheDocument();
+    expect(screen.getByText("Email Provider — mock")).toBeInTheDocument();
     expect(screen.getByText("12h")).toBeInTheDocument();
     expect(screen.getByText("Not configured")).toBeInTheDocument();
   });

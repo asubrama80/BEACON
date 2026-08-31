@@ -4,6 +4,7 @@ import type { PublicInvitation } from "./types";
 import { requestGuestOtp, verifyGuestOtp, getGuestSession, guestLogout, type GuestSessionInfo } from "../guestVerification/api";
 import GuestChatPanel from "../guestVerification/GuestChatPanel";
 import GuestWarRoomPanel from "../guestVerification/GuestWarRoomPanel";
+import "../auth/LoginPage.css";
 
 const REASON_MESSAGE: Record<string, string> = {
   expired: "This invitation link has expired.",
@@ -131,7 +132,19 @@ export default function GuestLandingPage({ token }: GuestLandingPageProps): JSX.
   return (
     <div className="app-shell-loading" style={{ flexDirection: "column", gap: 16 }}>
       <div className="card" style={{ maxWidth: phase === "verified" ? 520 : 420, padding: 24, textAlign: "center" }}>
-        <h1 style={{ fontSize: 20, marginBottom: 8 }}>BEACON Guest {phase === "verified" ? "Portal" : "Invitation"}</h1>
+        <div className="login-brand" style={{ justifyContent: "center", marginBottom: 16 }}>
+          <div className="login-brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+              <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+              <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+            </svg>
+          </div>
+          <div style={{ textAlign: "left" }}>
+            <h1 style={{ fontSize: 18 }}>BEACON</h1>
+            <p>Guest {phase === "verified" ? "Portal" : "Invitation"}</p>
+          </div>
+        </div>
 
         {phase === "loading" && <p className="cell-muted">Loading…</p>}
 

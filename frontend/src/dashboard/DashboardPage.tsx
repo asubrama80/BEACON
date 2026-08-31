@@ -89,17 +89,24 @@ export default function DashboardPage({ onNavigateToIncidents, onNavigateToAlert
       </div>
 
       {hasAttention && (
-        <div className="card section-block" style={{ borderColor: "var(--warn, #f59e0b)" }}>
-          <div className="card-pad">
-            <div className="section-heading">Attention Required</div>
-            <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+        <div className="attention-card">
+          <div className="attention-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 9v4" />
+              <path d="M12 17h.01" />
+              <path d="M10.3 4.2 2.6 18a1.8 1.8 0 0 0 1.6 2.7h15.6a1.8 1.8 0 0 0 1.6-2.7L13.7 4.2a1.8 1.8 0 0 0-3.4 0Z" />
+            </svg>
+          </div>
+          <div>
+            <div className="attention-card-title">Attention Required</div>
+            <ul>
               {attention.readyAlertsNotDispatched > 0 && (
-                <li className="cell-primary">
+                <li>
                   {attention.readyAlertsNotDispatched} alert{attention.readyAlertsNotDispatched === 1 ? "" : "s"} ready but not yet dispatched
                 </li>
               )}
               {attention.deliveryFailures > 0 && (
-                <li className="cell-primary">{attention.deliveryFailures} delivery failure{attention.deliveryFailures === 1 ? "" : "s"} across recent alerts</li>
+                <li>{attention.deliveryFailures} delivery failure{attention.deliveryFailures === 1 ? "" : "s"} across recent alerts</li>
               )}
             </ul>
           </div>

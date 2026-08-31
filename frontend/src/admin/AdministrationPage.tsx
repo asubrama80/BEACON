@@ -78,57 +78,77 @@ export default function AdministrationPage({ onNavigateToUsers, onNavigateToAudi
       <h2 className="page-heading">Administration</h2>
       <p className="page-lede">Application configuration, security posture, and role visibility.</p>
 
-      <div className="metric-grid">
-        <div className="card metric-card">
-          <div className="metric-label">Application</div>
-          <div className="cell-primary">{status.application.name}</div>
-          <div className="metric-foot">
-            v{status.application.version} · {status.application.environment}
+      <div className="admin-grid section-block">
+        <div className="card card-pad">
+          <div className="admin-section-title">System</div>
+          <div className="kv-row">
+            <span className="kv-k">Application</span>
+            <span className="kv-v">{status.application.name}</span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-k">Version</span>
+            <span className="kv-v mono">{status.application.version}</span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-k">Environment</span>
+            <span className="kv-v">{status.application.environment}</span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-k">Database</span>
+            <span className={`status-pill ${status.database.connected ? "status-connected" : "status-failed"}`}>
+              {status.database.connected ? "Connected" : "Unavailable"}
+            </span>
           </div>
         </div>
-        <div className="card metric-card">
-          <div className="metric-label">Database</div>
-          <span className={`badge ${status.database.connected ? "badge-success" : "badge-critical"}`}>
-            {status.database.connected ? "Connected" : "Unavailable"}
-          </span>
-        </div>
-        <div className="card metric-card">
-          <div className="metric-label">Communication Providers</div>
-          <div className="metric-foot">SMS: {status.providers.sms} · Email: {status.providers.email}</div>
-        </div>
-        <div className="card metric-card">
-          <div className="metric-label">Collaboration Provider</div>
-          <span className="badge badge-neutral">Foundation only</span>
-        </div>
-      </div>
 
-      <div className="card section-block">
-        <div className="card-pad">
-          <div className="section-heading">Security</div>
-          <div className="form-grid">
-            <div>
-              <div className="cell-muted">MFA available</div>
-              <div className="cell-primary">{status.security.mfaAvailable ? "Yes" : "No"}</div>
-            </div>
-            <div>
-              <div className="cell-muted">Session lifetime</div>
-              <div className="cell-primary">{status.security.sessionTtlHours}h</div>
-            </div>
-            <div>
-              <div className="cell-muted">Minimum password length</div>
-              <div className="cell-primary">{status.security.passwordMinLength}</div>
-            </div>
-            <div>
-              <div className="cell-muted">Login lockout threshold</div>
-              <div className="cell-primary">{status.security.loginMaxFailures} failed attempts</div>
-            </div>
-            <div>
-              <div className="cell-muted">Break-glass account</div>
-              <div className="cell-primary">
-                {status.security.breakGlass.present ? `Present (${status.security.breakGlass.status})` : "Not configured"}
-              </div>
-            </div>
+        <div className="card card-pad">
+          <div className="admin-section-title">Communication Providers</div>
+          <div className="kv-row">
+            <span className="kv-k">SMS Provider — {status.providers.sms}</span>
+            <span className="status-pill status-connected">Configured</span>
           </div>
+          <div className="kv-row">
+            <span className="kv-k">Email Provider — {status.providers.email}</span>
+            <span className="status-pill status-connected">Configured</span>
+          </div>
+        </div>
+
+        <div className="card card-pad">
+          <div className="admin-section-title">Authentication &amp; Security</div>
+          <div className="kv-row">
+            <span className="kv-k">Local MFA</span>
+            <span className="status-pill status-connected">{status.security.mfaAvailable ? "Available" : "Unavailable"}</span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-k">Session lifetime</span>
+            <span className="kv-v">{status.security.sessionTtlHours}h</span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-k">Minimum password length</span>
+            <span className="kv-v">{status.security.passwordMinLength}</span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-k">Login lockout threshold</span>
+            <span className="kv-v">{status.security.loginMaxFailures} failed attempts</span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-k">Break-glass account</span>
+            <span className="kv-v">
+              {status.security.breakGlass.present ? `Present (${status.security.breakGlass.status})` : "Not configured"}
+            </span>
+          </div>
+        </div>
+
+        <div className="card card-pad">
+          <div className="admin-section-title">Collaboration Provider</div>
+          <div className="kv-row">
+            <span className="kv-k">Realtime Collaboration</span>
+            <span className="status-pill status-pending">Foundation only</span>
+          </div>
+          <p className="section-sub" style={{ marginTop: 10, lineHeight: 1.5 }}>
+            BEACON uses a provider-independent collaboration layer. Audio/video and screen sharing
+            are not yet implemented.
+          </p>
         </div>
       </div>
 

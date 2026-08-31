@@ -105,7 +105,7 @@ export default function GroupsPage(): JSX.Element {
       </div>
 
       {!loading && items.length === 0 && (
-        <div className="empty-state">
+        <div className="card empty-state">
           <p>No groups found.</p>
         </div>
       )}

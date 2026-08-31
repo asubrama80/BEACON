@@ -51,6 +51,9 @@ const listQuerySchema = {
     status: { type: "string", enum: ["draft", "ready", "cancelled"] },
     channel: { type: "string", enum: ["sms", "email"] },
     incidentId: { type: "string", pattern: UUID_PATTERN },
+    // Module 21 — Alert History date-range filter.
+    from: { type: "string" },
+    to: { type: "string" },
     page: { type: "integer", minimum: 1 },
     pageSize: { type: "integer", minimum: 1, maximum: 100 },
   },
@@ -125,6 +128,8 @@ export async function alertsRoutes(app: FastifyInstance, opts: AlertsRoutesOptio
         status?: string;
         channel?: string;
         incidentId?: string;
+        from?: string;
+        to?: string;
         page?: number;
         pageSize?: number;
       };

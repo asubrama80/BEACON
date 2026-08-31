@@ -89,6 +89,9 @@ export interface ListIncidentsOptions {
   status?: string;
   severity?: string;
   commanderId?: string;
+  /** Module 21 — Incident History date-range filter, ISO 8601 strings. */
+  from?: string;
+  to?: string;
   page?: number;
   pageSize?: number;
 }
@@ -100,9 +103,22 @@ export interface ListIncidentsResponse {
   pageSize: number;
 }
 
+function parseDateFilter(value: string, fieldName: string): Date {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new AuthError(400, "invalid_request", `${fieldName} must be a valid date/time.`);
+  }
+  return parsed;
+}
+
 export async function listIncidents(db: Database, options: ListIncidentsOptions): Promise<ListIncidentsResponse> {
   const { page, pageSize } = normalizeIncidentPagination(options.page, options.pageSize);
-  const filter: ListIncidentsFilter = { ...options, page, pageSize };
+  const from = options.from ? parseDateFilter(options.from, "from") : undefined;
+  const to = options.to ? parseDateFilter(options.to, "to") : undefined;
+  if (from && to && from.getTime() > to.getTime()) {
+    throw new AuthError(400, "invalid_request", "from must not be after to.");
+  }
+  const filter: ListIncidentsFilter = { ...options, from, to, page, pageSize };
   const result = await queryIncidents(db, filter);
   return { items: result.items.map(toIncidentDto), total: result.total, page, pageSize };
 }

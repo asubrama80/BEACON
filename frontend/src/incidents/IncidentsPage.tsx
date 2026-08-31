@@ -32,6 +32,8 @@ export default function IncidentsPage({ onNavigateToAlerts }: IncidentsPageProps
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [severity, setSeverity] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -47,6 +49,8 @@ export default function IncidentsPage({ onNavigateToAlerts }: IncidentsPageProps
         search: search || undefined,
         status: status || undefined,
         severity: severity || undefined,
+        from: from ? new Date(from).toISOString() : undefined,
+        to: to ? new Date(to).toISOString() : undefined,
       });
       setItems(response.items);
       setTotal(response.total);
@@ -55,7 +59,7 @@ export default function IncidentsPage({ onNavigateToAlerts }: IncidentsPageProps
     } finally {
       setLoading(false);
     }
-  }, [search, status, severity]);
+  }, [search, status, severity, from, to]);
 
   useEffect(() => {
     void refresh();
@@ -90,6 +94,8 @@ export default function IncidentsPage({ onNavigateToAlerts }: IncidentsPageProps
             <option value="high">High</option>
             <option value="critical">Critical</option>
           </select>
+          <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From date" />
+          <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" />
         </div>
         <div className="toolbar-actions">
           {canCreate && (

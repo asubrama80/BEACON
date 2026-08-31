@@ -11,6 +11,7 @@ import IncidentsPage from "./incidents/IncidentsPage";
 import AlertsPage from "./alerts/AlertsPage";
 import GuestLandingPage from "./guestInvitations/GuestLandingPage";
 import AuditPage from "./audit/AuditPage";
+import DashboardPage from "./dashboard/DashboardPage";
 
 const GUEST_INVITE_PATH = /^\/guest\/invite\/(.+)$/;
 
@@ -185,10 +186,10 @@ function AppShell(): JSX.Element {
         ) : view === "audit" && canViewAudit ? (
           <AuditPage />
         ) : (
-          <div className="app-shell-status-card">
-            <h2>Signed in</h2>
-            <p>Business modules are implemented in later steps.</p>
-          </div>
+          <DashboardPage
+            onNavigateToIncidents={canViewIncidents ? () => setView("incidents") : undefined}
+            onNavigateToAlerts={canViewAlerts ? navigateToAlerts : undefined}
+          />
         )}
       </main>
     </div>

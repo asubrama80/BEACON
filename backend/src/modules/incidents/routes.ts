@@ -35,6 +35,9 @@ const listQuerySchema = {
     status: { type: "string", enum: ["open", "active", "resolved", "closed"] },
     severity: { type: "string", enum: ["info", "warning", "high", "critical"] },
     commanderId: { type: "string", pattern: UUID_PATTERN },
+    // Module 21 — Incident History date-range filter.
+    from: { type: "string" },
+    to: { type: "string" },
     page: { type: "integer", minimum: 1 },
     pageSize: { type: "integer", minimum: 1, maximum: 100 },
   },
@@ -125,6 +128,8 @@ export async function incidentsRoutes(app: FastifyInstance, opts: IncidentsRoute
         status?: string;
         severity?: string;
         commanderId?: string;
+        from?: string;
+        to?: string;
         page?: number;
         pageSize?: number;
       };

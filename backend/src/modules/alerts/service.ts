@@ -152,6 +152,9 @@ export interface ListAlertsOptions {
   status?: string;
   channel?: string;
   incidentId?: string;
+  /** Module 21 — Alert History date-range filter, ISO 8601 strings. */
+  from?: string;
+  to?: string;
   page?: number;
   pageSize?: number;
 }
@@ -163,9 +166,22 @@ export interface ListAlertsResponse {
   pageSize: number;
 }
 
+function parseAlertDateFilter(value: string, fieldName: string): Date {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new AuthError(400, "invalid_request", `${fieldName} must be a valid date/time.`);
+  }
+  return parsed;
+}
+
 export async function listAlerts(db: Database, options: ListAlertsOptions): Promise<ListAlertsResponse> {
   const { page, pageSize } = normalizePagination(options.page, options.pageSize);
-  const filter: ListAlertsFilter = { ...options, page, pageSize };
+  const from = options.from ? parseAlertDateFilter(options.from, "from") : undefined;
+  const to = options.to ? parseAlertDateFilter(options.to, "to") : undefined;
+  if (from && to && from.getTime() > to.getTime()) {
+    throw new AuthError(400, "invalid_request", "from must not be after to.");
+  }
+  const filter: ListAlertsFilter = { ...options, from, to, page, pageSize };
   const result = await queryAlerts(db, filter);
   return { items: result.items.map(toAlertSummaryDto), total: result.total, page, pageSize };
 }

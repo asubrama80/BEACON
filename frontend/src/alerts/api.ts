@@ -49,6 +49,9 @@ export async function listAlerts(params: {
   status?: string;
   channel?: string;
   incidentId?: string;
+  /** Module 21 — Alert History date-range filter, ISO 8601 strings. */
+  from?: string;
+  to?: string;
   page?: number;
 }): Promise<AlertsListResponse> {
   const query = new URLSearchParams();
@@ -56,6 +59,8 @@ export async function listAlerts(params: {
   if (params.status) query.set("status", params.status);
   if (params.channel) query.set("channel", params.channel);
   if (params.incidentId) query.set("incidentId", params.incidentId);
+  if (params.from) query.set("from", params.from);
+  if (params.to) query.set("to", params.to);
   if (params.page) query.set("page", String(params.page));
 
   const response = await apiFetch(`/alerts?${query.toString()}`);

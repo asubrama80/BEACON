@@ -125,13 +125,7 @@ export interface DeliverySummaryCounts {
   failed: number;
 }
 
-export async function getDeliverySummary(db: DbOrTx, alertId: string): Promise<DeliverySummaryCounts> {
-  const rows = await db
-    .select({ status: alertRecipients.status, deliveryStatus: alertRecipients.deliveryStatus, count: sql<number>`count(*)::int` })
-    .from(alertRecipients)
-    .where(eq(alertRecipients.alertId, alertId))
-    .groupBy(alertRecipients.status, alertRecipients.deliveryStatus);
-
+function tallyDeliverySummary(rows: Array<{ status: string; deliveryStatus: string | null; count: number }>): DeliverySummaryCounts {
   const counts: DeliverySummaryCounts = {
     total: 0,
     submissionFailed: 0,
@@ -157,6 +151,15 @@ export async function getDeliverySummary(db: DbOrTx, alertId: string): Promise<D
   return counts;
 }
 
+export async function getDeliverySummary(db: DbOrTx, alertId: string): Promise<DeliverySummaryCounts> {
+  const rows = await db
+    .select({ status: alertRecipients.status, deliveryStatus: alertRecipients.deliveryStatus, count: sql<number>`count(*)::int` })
+    .from(alertRecipients)
+    .where(eq(alertRecipients.alertId, alertId))
+    .groupBy(alertRecipients.status, alertRecipients.deliveryStatus);
+  return tallyDeliverySummary(rows);
+}
+
 /**
  * Same aggregate shape as `getDeliverySummary`, but rolled up across every recipient of every
  * Alert belonging to one Incident — used by Module 12's Command Center. Joins to `alerts` only to
@@ -170,30 +173,16 @@ export async function getIncidentDeliverySummary(db: DbOrTx, incidentId: string)
     .innerJoin(alerts, eq(alerts.id, alertRecipients.alertId))
     .where(eq(alerts.incidentId, incidentId))
     .groupBy(alertRecipients.status, alertRecipients.deliveryStatus);
+  return tallyDeliverySummary(rows);
+}
 
-  const counts: DeliverySummaryCounts = {
-    total: 0,
-    submissionFailed: 0,
-    deliveryPending: 0,
-    delivered: 0,
-    undelivered: 0,
-    bounced: 0,
-    failed: 0,
-  };
-  for (const row of rows) {
-    counts.total += row.count;
-    if (row.status === "submission_failed") {
-      counts.submissionFailed += row.count;
-      continue;
-    }
-    if (row.status !== "submitted") continue;
-    if (row.deliveryStatus === "delivered") counts.delivered += row.count;
-    else if (row.deliveryStatus === "undelivered") counts.undelivered += row.count;
-    else if (row.deliveryStatus === "bounced") counts.bounced += row.count;
-    else if (row.deliveryStatus === "failed") counts.failed += row.count;
-    else counts.deliveryPending += row.count;
-  }
-  return counts;
+/** Module 21 — the Dashboard's global (not one-Incident-scoped) equivalent. */
+export async function getGlobalDeliverySummary(db: DbOrTx): Promise<DeliverySummaryCounts> {
+  const rows = await db
+    .select({ status: alertRecipients.status, deliveryStatus: alertRecipients.deliveryStatus, count: sql<number>`count(*)::int` })
+    .from(alertRecipients)
+    .groupBy(alertRecipients.status, alertRecipients.deliveryStatus);
+  return tallyDeliverySummary(rows);
 }
 
 export interface DeliveryEventRow {

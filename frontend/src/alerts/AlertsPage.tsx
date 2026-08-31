@@ -35,6 +35,8 @@ export default function AlertsPage({ deepLink, onDeepLinkHandled }: AlertsPagePr
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [channel, setChannel] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -62,6 +64,8 @@ export default function AlertsPage({ deepLink, onDeepLinkHandled }: AlertsPagePr
         search: search || undefined,
         status: status || undefined,
         channel: channel || undefined,
+        from: from ? new Date(from).toISOString() : undefined,
+        to: to ? new Date(to).toISOString() : undefined,
       });
       setItems(response.items);
       setTotal(response.total);
@@ -70,7 +74,7 @@ export default function AlertsPage({ deepLink, onDeepLinkHandled }: AlertsPagePr
     } finally {
       setLoading(false);
     }
-  }, [search, status, channel]);
+  }, [search, status, channel, from, to]);
 
   useEffect(() => {
     void refresh();
@@ -110,6 +114,8 @@ export default function AlertsPage({ deepLink, onDeepLinkHandled }: AlertsPagePr
             <option value="sms">SMS</option>
             <option value="email">Email</option>
           </select>
+          <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From date" />
+          <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" />
         </div>
         <div className="toolbar-actions">
           {canCreate && (

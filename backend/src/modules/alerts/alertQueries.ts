@@ -1,4 +1,4 @@
-import { and, eq, desc, ilike, or, sql } from "drizzle-orm";
+import { and, eq, desc, gte, ilike, lte, or, sql } from "drizzle-orm";
 import {
   alerts,
   alertContactSelections,
@@ -76,6 +76,9 @@ export interface ListAlertsFilter {
   status?: string | undefined;
   channel?: string | undefined;
   incidentId?: string | undefined;
+  /** Module 21 — Alert History date-range filter, on `created_at`. */
+  from?: Date | undefined;
+  to?: Date | undefined;
   page: number;
   pageSize: number;
 }
@@ -94,6 +97,8 @@ export async function listAlerts(db: Database, filter: ListAlertsFilter): Promis
   if (filter.status) conditions.push(eq(alerts.status, filter.status));
   if (filter.channel) conditions.push(eq(alerts.channel, filter.channel));
   if (filter.incidentId) conditions.push(eq(alerts.incidentId, filter.incidentId));
+  if (filter.from) conditions.push(gte(alerts.createdAt, filter.from));
+  if (filter.to) conditions.push(lte(alerts.createdAt, filter.to));
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
   const [countRow] = await db.select({ count: sql<number>`count(*)::int` }).from(alerts).where(whereClause);
@@ -129,13 +134,7 @@ export interface IncidentAlertStatusCounts {
  * touches recipient rows or destination PII; purely a `GROUP BY alerts.status` count. See
  * claude/prompts/12-incident-command-center.md, "Alert communication summary".
  */
-export async function getIncidentAlertStatusCounts(db: DbOrTx, incidentId: string): Promise<IncidentAlertStatusCounts> {
-  const rows = await db
-    .select({ status: alerts.status, count: sql<number>`count(*)::int` })
-    .from(alerts)
-    .where(eq(alerts.incidentId, incidentId))
-    .groupBy(alerts.status);
-
+function tallyAlertStatusCounts(rows: Array<{ status: string; count: number }>): IncidentAlertStatusCounts {
   const counts: IncidentAlertStatusCounts = {
     total: 0,
     draft: 0,
@@ -175,6 +174,21 @@ export async function getIncidentAlertStatusCounts(db: DbOrTx, incidentId: strin
     }
   }
   return counts;
+}
+
+export async function getIncidentAlertStatusCounts(db: DbOrTx, incidentId: string): Promise<IncidentAlertStatusCounts> {
+  const rows = await db
+    .select({ status: alerts.status, count: sql<number>`count(*)::int` })
+    .from(alerts)
+    .where(eq(alerts.incidentId, incidentId))
+    .groupBy(alerts.status);
+  return tallyAlertStatusCounts(rows);
+}
+
+/** Module 21 — the Dashboard's global (not one-Incident-scoped) equivalent. */
+export async function getGlobalAlertStatusCounts(db: DbOrTx): Promise<IncidentAlertStatusCounts> {
+  const rows = await db.select({ status: alerts.status, count: sql<number>`count(*)::int` }).from(alerts).groupBy(alerts.status);
+  return tallyAlertStatusCounts(rows);
 }
 
 export async function findAlertById(db: DbOrTx, id: string): Promise<AlertRow | undefined> {

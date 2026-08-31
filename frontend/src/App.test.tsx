@@ -2,8 +2,29 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 
-function mockAuthMe(response: { ok: boolean; json: () => Promise<unknown> }): void {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
+const EMPTY_DASHBOARD = {
+  incidents: { total: 0, open: 0, active: 0, resolved: 0, closed: 0, recent: [] },
+  alerts: { total: 0, draft: 0, ready: 0, dispatching: 0, submitted: 0, partiallySubmitted: 0, submissionFailed: 0, cancelled: 0, delivery: { total: 0, submissionFailed: 0, deliveryPending: 0, delivered: 0, undelivered: 0, bounced: 0, failed: 0 }, recent: [] },
+  contacts: { active: 0 },
+  groups: { active: 0 },
+  attention: { readyAlertsNotDispatched: 0, deliveryFailures: 0 },
+};
+
+/** Every test lands on the Dashboard (the default view) at least momentarily, so `/dashboard`
+ * must always resolve to a valid empty shape regardless of which other endpoint a test cares
+ * about — otherwise DashboardPage's own fetch throws/crashes the render before the test's
+ * assertions ever run. */
+function mockAuthMe(authMeResponse: { ok: boolean; json: () => Promise<unknown> }): void {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((input: string | URL) => {
+      const path = new URL(String(input)).pathname;
+      if (path === "/dashboard") {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(EMPTY_DASHBOARD) });
+      }
+      return Promise.resolve(authMeResponse);
+    }),
+  );
 }
 
 describe("App", () => {
@@ -44,7 +65,7 @@ describe("App", () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText("Signed in")).toBeInTheDocument();
+      expect(screen.getByText("Active Contacts")).toBeInTheDocument();
     });
     expect(screen.getByText("Jane Responder")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Log out" })).toBeInTheDocument();
@@ -71,7 +92,7 @@ describe("App", () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText("Signed in")).toBeInTheDocument();
+      expect(screen.getByText("Active Contacts")).toBeInTheDocument();
     });
     expect(screen.queryByRole("button", { name: "Users" })).not.toBeInTheDocument();
   });
@@ -121,6 +142,9 @@ describe("App", () => {
             json: () => Promise.resolve({ items: [], total: 0, page: 1, pageSize: 25 }),
           });
         }
+        if (path === "/dashboard") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve(EMPTY_DASHBOARD) });
+        }
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
       }),
     );
@@ -163,6 +187,9 @@ describe("App", () => {
             ok: true,
             json: () => Promise.resolve({ items: [], total: 0, page: 1, pageSize: 25 }),
           });
+        }
+        if (path === "/dashboard") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve(EMPTY_DASHBOARD) });
         }
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
       }),
@@ -208,6 +235,9 @@ describe("App", () => {
             json: () => Promise.resolve({ items: [], total: 0, page: 1, pageSize: 25 }),
           });
         }
+        if (path === "/dashboard") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve(EMPTY_DASHBOARD) });
+        }
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
       }),
     );
@@ -250,6 +280,9 @@ describe("App", () => {
             ok: true,
             json: () => Promise.resolve({ items: [], total: 0, page: 1, pageSize: 25 }),
           });
+        }
+        if (path === "/dashboard") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve(EMPTY_DASHBOARD) });
         }
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
       }),
@@ -294,6 +327,9 @@ describe("App", () => {
             json: () => Promise.resolve({ items: [], total: 0, page: 1, pageSize: 25 }),
           });
         }
+        if (path === "/dashboard") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve(EMPTY_DASHBOARD) });
+        }
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
       }),
     );
@@ -329,7 +365,7 @@ describe("App", () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText("Signed in")).toBeInTheDocument();
+      expect(screen.getByText("Active Contacts")).toBeInTheDocument();
     });
     expect(screen.queryByRole("button", { name: "Incidents" })).not.toBeInTheDocument();
   });
@@ -362,6 +398,9 @@ describe("App", () => {
             ok: true,
             json: () => Promise.resolve({ items: [], total: 0, page: 1, pageSize: 25 }),
           });
+        }
+        if (path === "/dashboard") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve(EMPTY_DASHBOARD) });
         }
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
       }),
@@ -398,7 +437,7 @@ describe("App", () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText("Signed in")).toBeInTheDocument();
+      expect(screen.getByText("Active Contacts")).toBeInTheDocument();
     });
     expect(screen.queryByRole("button", { name: "Alerts" })).not.toBeInTheDocument();
   });

@@ -1,4 +1,4 @@
-import { and, eq, desc, ilike, or, sql } from "drizzle-orm";
+import { and, eq, desc, gte, ilike, lte, or, sql } from "drizzle-orm";
 import { incidents, incidentParticipants, users, type Database, type DbOrTx } from "@beacon/database";
 import type { IncidentRow } from "./dto.js";
 
@@ -57,6 +57,9 @@ export interface ListIncidentsFilter {
   status?: string | undefined;
   severity?: string | undefined;
   commanderId?: string | undefined;
+  /** Module 21 — Incident History date-range filter, on `created_at`. */
+  from?: Date | undefined;
+  to?: Date | undefined;
   page: number;
   pageSize: number;
 }
@@ -76,6 +79,8 @@ export async function listIncidents(db: Database, filter: ListIncidentsFilter): 
   if (filter.status) conditions.push(eq(incidents.status, filter.status));
   if (filter.severity) conditions.push(eq(incidents.severity, filter.severity));
   if (filter.commanderId) conditions.push(eq(incidents.incidentCommanderId, filter.commanderId));
+  if (filter.from) conditions.push(gte(incidents.createdAt, filter.from));
+  if (filter.to) conditions.push(lte(incidents.createdAt, filter.to));
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
   const [countRow] = await db.select({ count: sql<number>`count(*)::int` }).from(incidents).where(whereClause);
@@ -93,6 +98,34 @@ export async function listIncidents(db: Database, filter: ListIncidentsFilter): 
     .offset((filter.page - 1) * filter.pageSize);
 
   return { items, total };
+}
+
+export interface IncidentStatusCounts {
+  total: number;
+  open: number;
+  active: number;
+  resolved: number;
+  closed: number;
+}
+
+/**
+ * Module 21 — Dashboard's global (not one-Incident-scoped) status breakdown, mirroring
+ * `alerts/alertQueries.ts`'s `getIncidentAlertStatusCounts` shape exactly: a plain `GROUP BY
+ * status` count, never a second incident-status model. See
+ * claude/prompts/21-dashboard-history.md, "Metric definitions".
+ */
+export async function getIncidentStatusCounts(db: DbOrTx): Promise<IncidentStatusCounts> {
+  const rows = await db.select({ status: incidents.status, count: sql<number>`count(*)::int` }).from(incidents).groupBy(incidents.status);
+
+  const counts: IncidentStatusCounts = { total: 0, open: 0, active: 0, resolved: 0, closed: 0 };
+  for (const row of rows) {
+    counts.total += row.count;
+    if (row.status === "open") counts.open += row.count;
+    else if (row.status === "active") counts.active += row.count;
+    else if (row.status === "resolved") counts.resolved += row.count;
+    else if (row.status === "closed") counts.closed += row.count;
+  }
+  return counts;
 }
 
 export async function findIncidentById(db: DbOrTx, id: string): Promise<IncidentRow | undefined> {

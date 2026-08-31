@@ -34,12 +34,17 @@ export async function listIncidents(params: {
   search?: string;
   status?: string;
   severity?: string;
+  /** Module 21 — Incident History date-range filter, ISO 8601 strings. */
+  from?: string;
+  to?: string;
   page?: number;
 }): Promise<IncidentsListResponse> {
   const query = new URLSearchParams();
   if (params.search) query.set("search", params.search);
   if (params.status) query.set("status", params.status);
   if (params.severity) query.set("severity", params.severity);
+  if (params.from) query.set("from", params.from);
+  if (params.to) query.set("to", params.to);
   if (params.page) query.set("page", String(params.page));
 
   const response = await apiFetch(`/incidents?${query.toString()}`);

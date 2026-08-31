@@ -32,6 +32,7 @@ import { guestInvitationPublicRoutes } from "./modules/guestInvitations/publicRo
 import { loadGuestVerificationConfig, type GuestVerificationConfig } from "./modules/guestVerification/config.js";
 import { guestVerificationPublicRoutes } from "./modules/guestVerification/publicRoutes.js";
 import "./modules/guestVerification/types.js";
+import { auditRoutes } from "./modules/audit/routes.js";
 
 export interface BuildAppOptions {
   env?: AppEnv;
@@ -113,6 +114,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       ...(options.onOtpGenerated ? { onOtpGenerated: options.onOtpGenerated } : {}),
     }),
   );
+  app.register((instance) => auditRoutes(instance, { config: authConfig }));
 
   app.setErrorHandler((error: FastifyError | AuthError, request, reply) => {
     if (error instanceof AuthError) {

@@ -25,6 +25,10 @@ export const auditLogs = pgTable(
     index("audit_logs_created_at_idx").on(table.createdAt),
     index("audit_logs_event_type_idx").on(table.eventType),
     index("audit_logs_resource_idx").on(table.resourceType, table.resourceId),
+    // Module 20 — backs the Audit search API's actor and Incident filters, both always combined
+    // with the default newest-first ordering.
+    index("audit_logs_actor_idx").on(table.actorType, table.actorId, table.createdAt),
+    index("audit_logs_incident_idx").on(table.incidentId, table.createdAt),
     check(
       "audit_logs_actor_type_check",
       sql`${table.actorType} IN ('user', 'contact', 'guest', 'system')`,

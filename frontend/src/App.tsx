@@ -10,6 +10,7 @@ import TemplatesPage from "./templates/TemplatesPage";
 import IncidentsPage from "./incidents/IncidentsPage";
 import AlertsPage from "./alerts/AlertsPage";
 import GuestLandingPage from "./guestInvitations/GuestLandingPage";
+import AuditPage from "./audit/AuditPage";
 
 const GUEST_INVITE_PATH = /^\/guest\/invite\/(.+)$/;
 
@@ -29,7 +30,7 @@ export default function App(): JSX.Element {
   );
 }
 
-type View = "dashboard" | "users" | "contacts" | "groups" | "templates" | "incidents" | "alerts";
+type View = "dashboard" | "users" | "contacts" | "groups" | "templates" | "incidents" | "alerts" | "audit";
 
 function AppShell(): JSX.Element {
   const { user, loading, logout } = useAuth();
@@ -59,6 +60,7 @@ function AppShell(): JSX.Element {
   const canViewTemplates = user.permissions.includes("templates.read");
   const canViewIncidents = user.permissions.includes("incidents.read");
   const canViewAlerts = user.permissions.includes("alerts.read");
+  const canViewAudit = user.permissions.includes("audit.read");
 
   return (
     <div className="app-shell">
@@ -84,7 +86,7 @@ function AppShell(): JSX.Element {
           <p className="app-shell-subtitle">Emergency Communication Platform</p>
         </div>
 
-        {(canViewUsers || canViewContacts || canViewGroups || canViewTemplates || canViewIncidents || canViewAlerts) && (
+        {(canViewUsers || canViewContacts || canViewGroups || canViewTemplates || canViewIncidents || canViewAlerts || canViewAudit) && (
           <nav className="app-shell-nav">
             <button
               type="button"
@@ -147,6 +149,15 @@ function AppShell(): JSX.Element {
                 Users
               </button>
             )}
+            {canViewAudit && (
+              <button
+                type="button"
+                className={`app-shell-nav-link ${view === "audit" ? "is-active" : ""}`}
+                onClick={() => setView("audit")}
+              >
+                Audit
+              </button>
+            )}
           </nav>
         )}
 
@@ -171,6 +182,8 @@ function AppShell(): JSX.Element {
           <GroupsPage />
         ) : view === "templates" && canViewTemplates ? (
           <TemplatesPage />
+        ) : view === "audit" && canViewAudit ? (
+          <AuditPage />
         ) : (
           <div className="app-shell-status-card">
             <h2>Signed in</h2>

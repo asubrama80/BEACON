@@ -242,3 +242,15 @@ export const MODULE_17_PERMISSIONS = [
 ] as const;
 
 export type Module17PermissionCode = (typeof MODULE_17_PERMISSIONS)[number]["code"];
+
+/**
+ * Module 20's Audit search permission — global (not Incident-scoped), mirroring the existing
+ * `users.read`/`roles.read`/`permissions.read` global convention rather than the `incidents.*`
+ * nested one, since Audit spans every domain, not just Incidents. See
+ * claude/prompts/20-audit.md, "Permission".
+ */
+export const MODULE_20_PERMISSIONS = [
+  { code: "audit.read", name: "View audit log", description: "Search and view BEACON's platform-wide audit trail." },
+] as const;
+
+export type Module20PermissionCode = (typeof MODULE_20_PERMISSIONS)[number]["code"];

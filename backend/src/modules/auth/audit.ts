@@ -63,10 +63,25 @@ export type AuthAuditEventType =
   | "GUEST_SESSION_REVOKED"
   | "GUEST_ACCESS_REVOKED";
 
+/** Module 20 — the audit `actor_type` check constraint already allowed `'guest'`, but nothing
+ * could ever select it: `recordAuthEvent()` inferred `actorType` purely from whether `actorId`
+ * was set, so a Guest-initiated event (no `users` row, ever) always fell through to `'system'` —
+ * a misattribution, not a deliberate "no known actor" case. See claude/prompts/20-audit.md,
+ * "Actor model". */
+export type AuditActorType = "user" | "guest" | "system";
+
 export interface RecordAuthEventInput {
   eventType: AuthAuditEventType;
-  /** Set for events tied to a known user; omit for e.g. a failed login against an unknown email. */
+  /**
+   * The acting identity's id — a `users.id` when `actorType` is `"user"` (the default when
+   * omitted), or a `guest_invitations.id` when `actorType` is `"guest"` (Module 17's identity-
+   * anchor decision: the invitation row IS the Guest identity, so it's the only id a Guest actor
+   * can safely reference). Omit entirely for a genuine system-generated event.
+   */
   actorId?: string;
+  /** Defaults to `"user"` when `actorId` is set, `"system"` when it isn't — pass explicitly for
+   * a Guest-attributed event so it isn't misattributed to `"system"`. */
+  actorType?: AuditActorType;
   /** The user (or other resource) this action was performed on, if different from the actor. */
   resourceId?: string;
   resourceType?: string;
@@ -82,7 +97,7 @@ export interface RecordAuthEventInput {
 export async function recordAuthEvent(db: DbOrTx, input: RecordAuthEventInput): Promise<void> {
   await db.insert(auditLogs).values({
     eventType: input.eventType,
-    actorType: input.actorId ? "user" : "system",
+    actorType: input.actorType ?? (input.actorId ? "user" : "system"),
     actorId: input.actorId,
     resourceType: input.resourceType,
     resourceId: input.resourceId,

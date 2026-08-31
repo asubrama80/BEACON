@@ -89,6 +89,8 @@ export async function requestOtp(
 
   await recordAuthEvent(db, {
     eventType: "GUEST_OTP_REQUESTED",
+    actorType: "guest",
+    actorId: lookup.id,
     resourceType: "guest_invitation",
     resourceId: lookup.id,
     incidentId: lookup.incidentId,
@@ -131,6 +133,8 @@ export async function verifyOtp(
     if (lockedNow) {
       await recordAuthEvent(db, {
         eventType: "GUEST_VERIFICATION_FAILED_LIMIT",
+        actorType: "guest",
+        actorId: lookup.id,
         resourceType: "guest_invitation",
         resourceId: lookup.id,
         incidentId: lookup.incidentId,
@@ -173,6 +177,8 @@ export async function verifyOtp(
 
   await recordAuthEvent(db, {
     eventType: "GUEST_VERIFICATION_SUCCEEDED",
+    actorType: "guest",
+    actorId: lookup.id,
     resourceType: "guest_invitation",
     resourceId: lookup.id,
     incidentId: lookup.incidentId,
@@ -190,6 +196,8 @@ export async function logoutGuest(db: Database, guestSessionId: string, invitati
   await revokeGuestSession(db, guestSessionId);
   await recordAuthEvent(db, {
     eventType: "GUEST_SESSION_REVOKED",
+    actorType: "guest",
+    actorId: invitationId,
     resourceType: "guest_invitation",
     resourceId: invitationId,
     incidentId,

@@ -24,7 +24,7 @@ Work proceeds one module at a time, in order, unless the user directs otherwise.
 - [x] 17 Guest Invitations
 - [x] 18 OTP Verification
 - [x] 19 Participant Management
-- [ ] 20 Audit
+- [x] 20 Audit
 - [ ] 21 Dashboard & History
 - [ ] 22 Administration
 - [ ] 23 Security Hardening

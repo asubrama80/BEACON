@@ -183,6 +183,15 @@ describe.skipIf(!process.env.DATABASE_URL)("incident chat WebSocket (live databa
       expect(result.statusCode).toBe(401);
     });
 
+    it("Module 24 — rejects a connection with a syntactically-present but invalid/garbage session cookie", async () => {
+      const incidentId = await createRawIncident();
+      const ws = new WebSocket(`${wsBaseUrl}/ws/incidents/${incidentId}/chat`, {
+        headers: { Origin: TEST_ORIGIN, Cookie: `${config.sessionCookieName}=not-a-real-session-token-at-all` },
+      });
+      const result = await waitForRejection(ws);
+      expect(result.statusCode).toBe(401);
+    });
+
     it("rejects a connection from an unexpected Origin", async () => {
       const incidentId = await createRawIncident();
       const ws = connect(incidentId, admin, "https://evil.example");
@@ -310,6 +319,34 @@ describe.skipIf(!process.env.DATABASE_URL)("incident chat WebSocket (live databa
 
       wsA.close();
       wsB.close();
+    });
+
+    it("Module 24 — multiple rapid sends without waiting for each ack are persisted and broadcast in order", async () => {
+      const incidentId = await createRawIncident();
+      const ws = connect(incidentId, admin);
+      await waitForOpen(ws);
+      await nextMessage(ws); // "connected"
+
+      // Fire all five frames back-to-back without awaiting each response — proves ordering holds
+      // under a genuine send burst, not just the one-at-a-time pattern every other test in this
+      // file uses.
+      for (let i = 0; i < 5; i += 1) {
+        sendFrame(ws, { type: "send", body: `rapid ${i}`, requestId: `rapid-${i}` });
+      }
+      const acks: Record<string, unknown>[] = [];
+      for (let i = 0; i < 5; i += 1) {
+        acks.push(await nextMessage(ws));
+      }
+      expect(acks.map((a) => a.requestId)).toEqual(["rapid-0", "rapid-1", "rapid-2", "rapid-3", "rapid-4"]);
+      expect(acks.every((a) => a.type === "sent")).toBe(true);
+
+      const rows = await db
+        .select({ seq: chatMessages.seq, messageText: chatMessages.messageText })
+        .from(chatMessages)
+        .where(eq(chatMessages.incidentId, incidentId))
+        .orderBy(chatMessages.seq);
+      expect(rows.map((r) => r.messageText)).toEqual(["rapid 0", "rapid 1", "rapid 2", "rapid 3", "rapid 4"]);
+      ws.close();
     });
   });
 

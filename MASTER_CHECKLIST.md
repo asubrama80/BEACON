@@ -28,6 +28,6 @@ Work proceeds one module at a time, in order, unless the user directs otherwise.
 - [x] 21 Dashboard & History
 - [x] 22 Administration
 - [x] 23 Security Hardening
-- [ ] 24 Testing
+- [x] 24 Testing
 - [ ] 25 Docker Deployment
 - [ ] 26 Production Readiness

@@ -123,6 +123,18 @@ describe.skipIf(!process.env.DATABASE_URL)("Twilio status webhook (live database
     expect(response.statusCode).toBe(403);
   });
 
+  it("Module 24 — a validly-signed but malformed payload (missing MessageStatus) is rejected safely, not mistaken for a signature failure", async () => {
+    const response = await postCallback({ MessageSid: `SM${randomUUID().replace(/-/g, "")}` });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toBe("invalid_payload");
+  });
+
+  it("Module 24 — a validly-signed but malformed payload (missing MessageSid) is rejected safely", async () => {
+    const response = await postCallback({ MessageStatus: "delivered" });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toBe("invalid_payload");
+  });
+
   it.each([
     ["queued", "submitted"],
     ["sending", "submitted"],

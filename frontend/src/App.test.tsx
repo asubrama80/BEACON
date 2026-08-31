@@ -441,4 +441,175 @@ describe("App", () => {
     });
     expect(screen.queryByRole("button", { name: "Alerts" })).not.toBeInTheDocument();
   });
+
+  it("Module 24 — shows Administration navigation for a user with admin.read and can reach the page", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL) => {
+        const path = new URL(String(input)).pathname;
+        if (path === "/auth/me") {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                user: {
+                  id: "aaaaaaaa-1111-1111-1111-111111111111",
+                  email: "admin-nav@example.invalid",
+                  displayName: "Admin Nav User",
+                  status: "active",
+                  isBreakGlass: false,
+                  mfaEnabled: false,
+                  roles: ["ADMIN"],
+                  permissions: ["admin.read"],
+                },
+              }),
+          });
+        }
+        if (path === "/admin/status") {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                application: { name: "beacon-backend", version: "0.0.0", environment: "test" },
+                database: { connected: true },
+                security: { mfaAvailable: true, sessionTtlHours: 12, passwordMinLength: 12, loginMaxFailures: 5, breakGlass: { present: false, status: null } },
+                providers: { sms: "mock", email: "mock" },
+                collaboration: { status: "foundation_only" },
+              }),
+          });
+        }
+        if (path === "/admin/roles") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [] }) });
+        }
+        if (path === "/dashboard") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve(EMPTY_DASHBOARD) });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }),
+    );
+
+    render(<App />);
+
+    const adminNavButton = await screen.findByRole("button", { name: "Administration" });
+    adminNavButton.click();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2, name: "Administration" })).toBeInTheDocument();
+    });
+  });
+
+  it("Module 24 — does not show Administration navigation for a user without admin.read", async () => {
+    mockAuthMe({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          user: {
+            id: "aaaaaaaa-2222-2222-2222-222222222222",
+            email: "noaccess-admin@example.invalid",
+            displayName: "No Admin Access User",
+            status: "active",
+            isBreakGlass: false,
+            mfaEnabled: false,
+            roles: [],
+            permissions: [],
+          },
+        }),
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Active Contacts")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: "Administration" })).not.toBeInTheDocument();
+  });
+
+  it("Module 24 — shows Audit navigation for a user with audit.read and can reach the page", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL) => {
+        const path = new URL(String(input)).pathname;
+        if (path === "/auth/me") {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                user: {
+                  id: "bbbbbbbb-1111-1111-1111-111111111111",
+                  email: "auditor-nav@example.invalid",
+                  displayName: "Auditor Nav User",
+                  status: "active",
+                  isBreakGlass: false,
+                  mfaEnabled: false,
+                  roles: ["AUDITOR"],
+                  permissions: ["audit.read"],
+                },
+              }),
+          });
+        }
+        if (path === "/audit") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [], nextCursor: null }) });
+        }
+        if (path === "/dashboard") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve(EMPTY_DASHBOARD) });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }),
+    );
+
+    render(<App />);
+
+    const auditNavButton = await screen.findByRole("button", { name: "Audit" });
+    auditNavButton.click();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2, name: "Audit" })).toBeInTheDocument();
+    });
+  });
+
+  it("Module 24 — does not show Audit navigation for a user without audit.read", async () => {
+    mockAuthMe({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          user: {
+            id: "bbbbbbbb-2222-2222-2222-222222222222",
+            email: "noaccess-audit@example.invalid",
+            displayName: "No Audit Access User",
+            status: "active",
+            isBreakGlass: false,
+            mfaEnabled: false,
+            roles: [],
+            permissions: [],
+          },
+        }),
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Active Contacts")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: "Audit" })).not.toBeInTheDocument();
+  });
+
+  it("Module 24 — a Guest session cookie never grants access to the authenticated shell (401 falls back to login)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL) => {
+        const path = new URL(String(input)).pathname;
+        if (path === "/auth/me") {
+          return Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({ error: "not_authenticated" }) });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }),
+    );
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 1, name: "BEACON" })).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+  });
 });

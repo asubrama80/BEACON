@@ -208,6 +208,38 @@ describe.skipIf(!process.env.DATABASE_URL)("guest participant / chat / war room 
       expect(rows[0]!.contactId).toBeNull();
     });
 
+    it("Module 24 — two genuinely concurrent first-time verifications never create more than one participant", async () => {
+      const incidentId = await createRawIncident();
+      const guestName = `Concurrent Enroll ${randomUUID().slice(0, 6)}`;
+      const created = await app.inject({
+        method: "POST",
+        url: `/incidents/${incidentId}/guest-invitations`,
+        ...authHeaders(commander),
+        payload: {
+          guestName,
+          email: `${guestName.toLowerCase().replace(/\s+/g, "-")}-${randomUUID().slice(0, 8)}@example.invalid`,
+          capabilities: { chat: true, warRoom: false },
+        },
+      });
+      const token = (created.json().invitationUrl as string).split("/guest/invite/")[1]!;
+      await app.inject({ method: "POST", url: `/guest/invitations/${token}/otp/request` });
+
+      const [first, second] = await Promise.all([
+        app.inject({ method: "POST", url: `/guest/invitations/${token}/otp/verify`, payload: { code: capturedCode } }),
+        app.inject({ method: "POST", url: `/guest/invitations/${token}/otp/verify`, payload: { code: capturedCode } }),
+      ]);
+      // Both may legitimately succeed (Module 18's design: a second correct submission of the
+      // same already-consumed code is a legitimate re-verification, not an error) — what matters
+      // is the enrollment side effect, gated race-safely on first-time verification only.
+      expect([first.statusCode, second.statusCode]).toContain(200);
+
+      const rows = await db.select().from(incidentParticipants).where(eq(incidentParticipants.incidentId, incidentId));
+      expect(rows).toHaveLength(1);
+
+      const timeline = await db.select().from(incidentTimelineEvents).where(eq(incidentTimelineEvents.incidentId, incidentId));
+      expect(timeline.filter((e) => e.eventType === "GUEST_VERIFIED")).toHaveLength(1);
+    });
+
     it("shows the Guest on the roster with capabilities and no destination, never a duplicate on re-auth", async () => {
       const incidentId = await createRawIncident();
       const guest = await inviteAndVerifyGuest(incidentId, { chat: true, warRoom: true }, "Roster Guest");
@@ -499,6 +531,33 @@ describe.skipIf(!process.env.DATABASE_URL)("guest participant / chat / war room 
       expect(sessions[0]!.participantType).toBe("guest");
       expect(sessions[0]!.userId).toBeNull();
       expect(sessions[0]!.guestInvitationId).toBe(guest.invitationId);
+    });
+
+    it("Module 24 — a Guest cannot retain new War Room access once removal has taken effect, even racing the join", async () => {
+      const incidentId = await createRawIncident();
+      await openWarRoom(incidentId);
+      const guest = await inviteAndVerifyGuest(incidentId, { chat: false, warRoom: true }, "Race Removed Guest");
+
+      const [participantRow] = await db
+        .select({ id: incidentParticipants.id })
+        .from(incidentParticipants)
+        .where(eq(incidentParticipants.guestInvitationId, guest.invitationId));
+
+      // Fire the join and the removal genuinely concurrently. Every War Room action
+      // re-authenticates the Guest session fresh against the DB (no persistent connection to
+      // outlive removal, unlike Chat's WebSocket) — so either ordering is safe: join may win
+      // (200, using the still-valid session) or removal may win (401, session already revoked).
+      // What must never happen is a join succeeding *after* removal has actually committed.
+      const [joinResult] = await Promise.all([
+        app.inject({ method: "POST", url: `/guest/incidents/${incidentId}/war-room/join`, ...guestAuth(guest) }),
+        app.inject({ method: "DELETE", url: `/incidents/${incidentId}/participants/${participantRow!.id}`, ...authHeaders(commander) }),
+      ]);
+      expect([200, 401]).toContain(joinResult.statusCode);
+
+      // Now that removal is guaranteed committed, any further attempt to gain new access must
+      // be denied — the removed Guest can never re-acquire War Room access via a later request.
+      const afterRemoval = await app.inject({ method: "POST", url: `/guest/incidents/${incidentId}/war-room/join`, ...guestAuth(guest) });
+      expect(afterRemoval.statusCode).toBe(401);
     });
 
     it("a duplicate join is idempotent (still exactly one active session)", async () => {

@@ -110,47 +110,61 @@ async function runConnection(socket: WebSocket, incidentId: string, actor: ChatA
 
   const sendTimestamps: number[] = [];
 
+  async function handleFrame(raw: Buffer): Promise<void> {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw.toString());
+    } catch {
+      safeSend(socket, { type: "error", error: "invalid_payload" });
+      return;
+    }
+
+    if (!isIncomingSendFrame(parsed)) {
+      safeSend(socket, { type: "error", error: "unknown_command" });
+      return;
+    }
+    const requestId = parsed.requestId;
+
+    const now = Date.now();
+    while (sendTimestamps.length > 0 && now - sendTimestamps[0]! > RATE_LIMIT_WINDOW_MS) {
+      sendTimestamps.shift();
+    }
+    if (sendTimestamps.length >= RATE_LIMIT_MAX_SENDS) {
+      safeSend(socket, { type: "error", error: "rate_limited", requestId });
+      return;
+    }
+
+    if (!(await actor.canSend())) {
+      safeSend(socket, { type: "error", error: "not_authorized", requestId });
+      return;
+    }
+
+    sendTimestamps.push(now);
+
+    try {
+      const message = await actor.send(incidentId, parsed.body);
+      safeSend(socket, { type: "sent", requestId, message });
+      broadcast(incidentId, { type: "message", message }, socket);
+    } catch (err) {
+      const safeMessage = err instanceof AuthError ? err.message : "Unable to send message.";
+      safeSend(socket, { type: "error", error: "send_failed", message: safeMessage, requestId });
+    }
+  }
+
+  // Module 24 — frames must be processed strictly in the order they're received. The previous
+  // implementation ran each frame's handler as its own independent async IIFE with no
+  // serialization: two rapid sends on the same connection could have their `canSend()`/`send()`
+  // DB calls interleave and complete out of order, persisting (and broadcasting) messages in a
+  // different order than the client sent them. Chaining onto a single per-connection promise
+  // forces strict FIFO processing — the next frame never starts until the previous one's full
+  // handling (including its DB writes) has settled. See
+  // claude/prompts/24-testing.md, "WebSocket message ordering".
+  let processingChain: Promise<void> = Promise.resolve();
   socket.on("message", (raw: Buffer) => {
-    void (async () => {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(raw.toString());
-      } catch {
-        safeSend(socket, { type: "error", error: "invalid_payload" });
-        return;
-      }
-
-      if (!isIncomingSendFrame(parsed)) {
-        safeSend(socket, { type: "error", error: "unknown_command" });
-        return;
-      }
-      const requestId = parsed.requestId;
-
-      const now = Date.now();
-      while (sendTimestamps.length > 0 && now - sendTimestamps[0]! > RATE_LIMIT_WINDOW_MS) {
-        sendTimestamps.shift();
-      }
-      if (sendTimestamps.length >= RATE_LIMIT_MAX_SENDS) {
-        safeSend(socket, { type: "error", error: "rate_limited", requestId });
-        return;
-      }
-
-      if (!(await actor.canSend())) {
-        safeSend(socket, { type: "error", error: "not_authorized", requestId });
-        return;
-      }
-
-      sendTimestamps.push(now);
-
-      try {
-        const message = await actor.send(incidentId, parsed.body);
-        safeSend(socket, { type: "sent", requestId, message });
-        broadcast(incidentId, { type: "message", message }, socket);
-      } catch (err) {
-        const safeMessage = err instanceof AuthError ? err.message : "Unable to send message.";
-        safeSend(socket, { type: "error", error: "send_failed", message: safeMessage, requestId });
-      }
-    })();
+    // `.catch()` on each link (not just the end of the chain) keeps the chain itself always
+    // resolved — an unexpected error handling one frame must never silently stop every later
+    // frame on this connection from being processed.
+    processingChain = processingChain.then(() => handleFrame(raw)).catch(() => {});
   });
 
   socket.on("close", () => {
